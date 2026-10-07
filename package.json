@@ -1,7 +1,7 @@
 {
   "name": "neon-dna",
   "version": "2.0.0",
-  "description": "NEON Discord Member DNA Card",
+  "description": "NEON DNA Discord member profile card",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
