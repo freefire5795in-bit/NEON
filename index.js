@@ -839,7 +839,7 @@ async function createDNAImage(
 
     <!-- ================= AVATAR ================= -->
 
-    <!-- تم تصغير الأفاتار -->
+    <!-- الأفاتار بدون أي تغيير -->
 
     <circle
       cx="195"
@@ -903,6 +903,8 @@ async function createDNAImage(
 
     <!-- ================= STATUS DOT ================= -->
 
+    <!-- نقطة الحالة كما هي -->
+
     <circle
       cx="274"
       cy="357"
@@ -919,13 +921,17 @@ async function createDNAImage(
       fill="${status.color}"
     />
 
-    <!-- ================= NAME ================= -->
+    <!-- ==================================================
+         هنا التعديل فقط:
+         حذف رقم العضو وحالة العضو من أعلى البطاقة
+         ووضع الاسم والهاشتاج مكانهم
+         ================================================== -->
 
     <text
       x="335"
-      y="218"
+      y="250"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="35"
+      font-size="40"
       font-weight="bold"
       fill="#f5f5f5"
     >
@@ -934,97 +940,12 @@ async function createDNAImage(
 
     <text
       x="337"
-      y="251"
+      y="289"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="18"
+      font-size="22"
       fill="#888"
     >
-      @${safeUsername}
-    </text>
-
-    <!-- ================= MEMBER NUMBER ================= -->
-
-    <rect
-      x="335"
-      y="273"
-      width="380"
-      height="45"
-      rx="6"
-      fill="#080808"
-      stroke="#a90010"
-      stroke-width="2"
-    />
-
-    <text
-      x="360"
-      y="302"
-      direction="rtl"
-      text-anchor="start"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="17"
-      font-weight="bold"
-      fill="#ff2635"
-    >
-      رقم العضو
-    </text>
-
-    <text
-      x="690"
-      y="303"
-      text-anchor="end"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="20"
-      font-weight="bold"
-      fill="#ffffff"
-    >
-      #${formatNumber(memberNumber)}
-    </text>
-
-    <!-- ================= STATUS ================= -->
-
-    <rect
-      x="335"
-      y="328"
-      width="380"
-      height="45"
-      rx="6"
-      fill="#080808"
-      stroke="#a90010"
-      stroke-width="2"
-    />
-
-    <text
-      x="360"
-      y="357"
-      direction="rtl"
-      text-anchor="start"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="17"
-      font-weight="bold"
-      fill="#ff2635"
-    >
-      حالة العضو
-    </text>
-
-    <!-- نقطة الحالة داخل خانة الحالة -->
-
-    <circle
-      cx="610"
-      cy="350"
-      r="7"
-      fill="${status.color}"
-    />
-
-    <text
-      x="635"
-      y="357"
-      text-anchor="middle"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="18"
-      font-weight="bold"
-      fill="${status.color}"
-    >
-      ${escapeXML(status.text)}
+      #${safeUsername}
     </text>
 
     <!-- ================= PROFILE BOX ================= -->
@@ -1401,8 +1322,6 @@ client.on(
         newState.id
       );
 
-    // دخل الفويس
-
     if (
       !oldState.channelId &&
       newState.channelId
@@ -1414,8 +1333,6 @@ client.on(
       saveSoon();
       return;
     }
-
-    // خرج من الفويس
 
     if (
       oldState.channelId &&
@@ -1446,8 +1363,6 @@ client.on(
       saveSoon();
       return;
     }
-
-    // نقل من روم إلى روم
 
     if (
       oldState.channelId &&
