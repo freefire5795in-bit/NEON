@@ -159,17 +159,10 @@ function formatDate(date) {
 
 // ======================================================
 // ACCOUNT AGE
-// مثال:
-// 28/05/2026 -> 07/10/2026
-// = 4 شهور
-//
-// هنا لا نعرض الأيام المتبقية.
 // ======================================================
 
 function getAccountAge(createdAt) {
-  if (!createdAt) {
-    return 'غير معروف';
-  }
+  if (!createdAt) return 'غير معروف';
 
   const now = new Date();
 
@@ -177,9 +170,7 @@ function getAccountAge(createdAt) {
     (now.getFullYear() - createdAt.getFullYear()) * 12 +
     (now.getMonth() - createdAt.getMonth());
 
-  if (
-    now.getDate() < createdAt.getDate()
-  ) {
+  if (now.getDate() < createdAt.getDate()) {
     months--;
   }
 
@@ -640,54 +631,6 @@ async function createDNAImage(
   }
 
   // ====================================================
-  // AVATAR SVG
-  // ====================================================
-
-  const avatarSVG = avatar
-    ? `
-      <defs>
-
-        <clipPath id="avatarClip">
-          <circle
-            cx="205"
-            cy="285"
-            r="137"
-          />
-        </clipPath>
-
-      </defs>
-
-      <image
-        href="${avatar}"
-        x="68"
-        y="148"
-        width="274"
-        height="274"
-        preserveAspectRatio="xMidYMid slice"
-        clip-path="url(#avatarClip)"
-      />
-    `
-    : `
-      <circle
-        cx="205"
-        cy="285"
-        r="137"
-        fill="#111"
-      />
-
-      <text
-        x="205"
-        y="300"
-        text-anchor="middle"
-        fill="#777"
-        font-size="35"
-        font-family="Arial"
-      >
-        NEON
-      </text>
-    `;
-
-  // ====================================================
   // SVG
   // ====================================================
 
@@ -766,7 +709,9 @@ async function createDNAImage(
 
     </defs>
 
-    <!-- BACKGROUND -->
+    <!-- ==================================================
+         BACKGROUND
+         ================================================== -->
 
     <rect
       width="1400"
@@ -775,7 +720,9 @@ async function createDNAImage(
       fill="url(#background)"
     />
 
-    <!-- OUTER FRAME -->
+    <!-- ==================================================
+         OUTER FRAME
+         ================================================== -->
 
     <path
       d="
@@ -833,8 +780,6 @@ async function createDNAImage(
       DISCORD SERVER
     </text>
 
-    <!-- الكلام اليمين مضبوط داخل الإطار -->
-
     <text
       x="1300"
       y="53"
@@ -870,7 +815,7 @@ async function createDNAImage(
     />
 
     <!-- ==================================================
-         TOP PROFILE
+         TOP PROFILE - FIXED
          ================================================== -->
 
     <rect
@@ -883,54 +828,93 @@ async function createDNAImage(
       stroke-width="1"
     />
 
-    <!-- AVATAR -->
+    <!-- ================= AVATAR ================= -->
 
     <circle
-      cx="205"
-      cy="285"
-      r="153"
+      cx="195"
+      cy="280"
+      r="139"
       fill="url(#avatarBorder)"
     />
 
     <circle
-      cx="205"
-      cy="285"
-      r="143"
+      cx="195"
+      cy="280"
+      r="130"
       fill="#050505"
       stroke="#ff1728"
       stroke-width="3"
     />
 
-    ${avatarSVG}
+    ${
+      avatar
+        ? `
+      <defs>
+        <clipPath id="avatarClip">
+          <circle
+            cx="195"
+            cy="280"
+            r="124"
+          />
+        </clipPath>
+      </defs>
 
-    <!-- ONLINE DOT -->
+      <image
+        href="${avatar}"
+        x="71"
+        y="156"
+        width="248"
+        height="248"
+        preserveAspectRatio="xMidYMid slice"
+        clip-path="url(#avatarClip)"
+      />
+      `
+        : `
+      <circle
+        cx="195"
+        cy="280"
+        r="124"
+        fill="#111"
+      />
+
+      <text
+        x="195"
+        y="295"
+        text-anchor="middle"
+        fill="#777"
+        font-size="30"
+        font-family="Arial, Tahoma, sans-serif"
+      >
+        NEON
+      </text>
+      `
+    }
+
+    <!-- ================= STATUS DOT ================= -->
 
     <circle
-      cx="314"
-      cy="389"
-      r="25"
+      cx="290"
+      cy="374"
+      r="23"
       fill="#050505"
       stroke="#ff1728"
       stroke-width="4"
     />
 
     <circle
-      cx="314"
-      cy="389"
-      r="15"
+      cx="290"
+      cy="374"
+      r="14"
       fill="${status.color}"
     />
 
-    <!-- ==================================================
-         NAME AREA
-         ================================================== -->
+    <!-- ================= NAME ================= -->
 
     <text
-      x="375"
-      y="225"
-      direction="ltr"
+      x="355"
+      y="218"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="36"
+      font-size="35"
       font-weight="bold"
       fill="#f5f5f5"
     >
@@ -938,9 +922,8 @@ async function createDNAImage(
     </text>
 
     <text
-      x="378"
-      y="258"
-      direction="ltr"
+      x="357"
+      y="251"
       font-family="Arial, Tahoma, sans-serif"
       font-size="18"
       fill="#888"
@@ -948,13 +931,13 @@ async function createDNAImage(
       @${safeUsername}
     </text>
 
-    <!-- MEMBER NUMBER -->
+    <!-- ================= MEMBER NUMBER ================= -->
 
     <rect
-      x="375"
-      y="280"
-      width="365"
-      height="43"
+      x="355"
+      y="273"
+      width="360"
+      height="45"
       rx="6"
       fill="#080808"
       stroke="#a90010"
@@ -962,9 +945,10 @@ async function createDNAImage(
     />
 
     <text
-      x="397"
-      y="308"
+      x="380"
+      y="302"
       direction="rtl"
+      text-anchor="start"
       font-family="Arial, Tahoma, sans-serif"
       font-size="17"
       font-weight="bold"
@@ -974,60 +958,61 @@ async function createDNAImage(
     </text>
 
     <text
-      x="715"
-      y="309"
+      x="690"
+      y="303"
       text-anchor="end"
-      direction="ltr"
       font-family="Arial, Tahoma, sans-serif"
       font-size="20"
       font-weight="bold"
-      fill="#fff"
+      fill="#ffffff"
     >
       #${memberNumber}
     </text>
 
-    <!-- STATUS -->
+    <!-- ================= STATUS ================= -->
 
     <rect
-      x="375"
-      y="335"
-      width="365"
-      height="43"
+      x="355"
+      y="328"
+      width="360"
+      height="45"
       rx="6"
       fill="#080808"
       stroke="#a90010"
       stroke-width="2"
     />
 
+    <text
+      x="380"
+      y="357"
+      direction="rtl"
+      text-anchor="start"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="17"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      حالة العضو
+    </text>
+
     <circle
-      cx="398"
-      cy="356"
+      cx="640"
+      cy="350"
       r="7"
       fill="${status.color}"
     />
 
     <text
-      x="417"
-      y="362"
-      direction="rtl"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="16"
-      fill="#aaa"
-    >
-      حالة العضو
-    </text>
-
-    <text
-      x="715"
-      y="363"
-      text-anchor="end"
+      x="660"
+      y="357"
+      text-anchor="start"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="18"
       font-weight="bold"
       fill="${status.color}"
     >
-      ${status.text}
+      ${escapeXML(status.text)}
     </text>
 
     <!-- ==================================================
