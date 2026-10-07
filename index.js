@@ -19,12 +19,12 @@ const CLIENT_ID = "1557370938650271824";
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
-  console.error("❌ توكن البوت غير موجود في إعدادات الاستضافة.");
+  console.error("❌ DISCORD_TOKEN غير موجود في الاستضافة.");
   process.exit(1);
 }
 
 /* =====================================================
-   تشغيل البوت
+   تشغيل Discord
 ===================================================== */
 
 const client = new Client({
@@ -51,8 +51,8 @@ if (fs.existsSync(DATA_FILE)) {
     data = JSON.parse(
       fs.readFileSync(DATA_FILE, "utf8")
     );
-  } catch (error) {
-    console.error("⚠️ تعذر قراءة ملف البيانات.");
+  } catch {
+    console.log("⚠️ تعذر قراءة ملف البيانات، سيتم إنشاء ملف جديد.");
     data = {};
   }
 }
@@ -70,7 +70,7 @@ function saveData() {
     );
   } catch (error) {
     console.error(
-      "❌ حدث خطأ أثناء حفظ البيانات:",
+      "❌ خطأ أثناء حفظ البيانات:",
       error
     );
   }
@@ -100,8 +100,8 @@ function getMemberData(guildId, userId) {
    حساب مدة العضوية
 ===================================================== */
 
-function getMembershipParts(date) {
-  if (!date) {
+function getMembershipTime(joinedAt) {
+  if (!joinedAt) {
     return {
       days: 0,
       hours: 0
@@ -110,7 +110,7 @@ function getMembershipParts(date) {
 
   const difference = Math.max(
     0,
-    Date.now() - date.getTime()
+    Date.now() - joinedAt.getTime()
   );
 
   const days = Math.floor(
@@ -128,57 +128,20 @@ function getMembershipParts(date) {
 }
 
 /* =====================================================
-   تنسيق وقت المكالمات
+   حساب عمر حساب Discord
 ===================================================== */
 
-function formatVoiceTime(seconds) {
-  seconds = Math.max(
-    0,
-    Math.floor(seconds)
-  );
-
-  const days = Math.floor(
-    seconds / 86400
-  );
-
-  seconds %= 86400;
-
-  const hours = Math.floor(
-    seconds / 3600
-  );
-
-  seconds %= 3600;
-
-  const minutes = Math.floor(
-    seconds / 60
-  );
-
-  if (days > 0) {
-    return `${days} يوم - ${hours} ساعة`;
-  }
-
-  if (hours > 0) {
-    return `${hours} ساعة - ${minutes} دقيقة`;
-  }
-
-  return `${minutes} دقيقة`;
-}
-
-/* =====================================================
-   عمر حساب ديسكورد
-===================================================== */
-
-function getAccountAge(date) {
-  if (!date) {
+function getAccountAge(createdAt) {
+  if (!createdAt) {
     return {
-      value: 0,
-      unit: "يوم"
+      number: 0,
+      text: "يوم"
     };
   }
 
   const difference = Math.max(
     0,
-    Date.now() - date.getTime()
+    Date.now() - createdAt.getTime()
   );
 
   const days = Math.floor(
@@ -195,76 +158,63 @@ function getAccountAge(date) {
 
   if (years > 0) {
     return {
-      value: years,
-      unit: years === 1 ? "سنة" : "سنوات"
+      number: years,
+      text: years === 1 ? "سنة" : "سنوات"
     };
   }
 
   if (months > 0) {
     return {
-      value: months,
-      unit: months === 1 ? "شهر" : "شهور"
+      number: months,
+      text: months === 1 ? "شهر" : "شهور"
     };
   }
 
   return {
-    value: days,
-    unit: "يوم"
+    number: days,
+    text: "يوم"
   };
 }
 
 /* =====================================================
-   رقم العضو في السيرفر
+   وقت المكالمات
 ===================================================== */
 
-async function getMemberNumber(
-  guild,
-  targetMember
-) {
-  try {
-    const members =
-      await guild.members.fetch();
+function formatVoiceTime(totalSeconds) {
+  totalSeconds = Math.max(
+    0,
+    Math.floor(totalSeconds)
+  );
 
-    const humanMembers =
-      members
-        .filter(member => !member.user.bot)
-        .sort((a, b) => {
-          const first =
-            a.joinedTimestamp || Infinity;
+  const days = Math.floor(
+    totalSeconds / 86400
+  );
 
-          const second =
-            b.joinedTimestamp || Infinity;
+  totalSeconds %= 86400;
 
-          return first - second;
-        });
+  const hours = Math.floor(
+    totalSeconds / 3600
+  );
 
-    const list =
-      [...humanMembers.values()];
+  totalSeconds %= 3600;
 
-    const index =
-      list.findIndex(
-        member =>
-          member.id === targetMember.id
-      );
+  const minutes = Math.floor(
+    totalSeconds / 60
+  );
 
-    if (index === -1) {
-      return list.length;
-    }
-
-    return index + 1;
-
-  } catch (error) {
-    console.error(
-      "⚠️ تعذر حساب رقم العضو:",
-      error
-    );
-
-    return 1;
+  if (days > 0) {
+    return `${days} يوم و ${hours} ساعة`;
   }
+
+  if (hours > 0) {
+    return `${hours} ساعة و ${minutes} دقيقة`;
+  }
+
+  return `${minutes} دقيقة`;
 }
 
 /* =====================================================
-   حماية النص
+   حماية النص داخل SVG
 ===================================================== */
 
 function escapeXML(text) {
@@ -312,6 +262,54 @@ function getMemberStatus(member) {
 }
 
 /* =====================================================
+   رقم العضو
+   يتم حسابه حسب ترتيب دخول الأعضاء للسيرفر
+===================================================== */
+
+async function getMemberNumber(
+  guild,
+  targetMember
+) {
+  try {
+    const members =
+      await guild.members.fetch();
+
+    const humans =
+      [...members.values()]
+        .filter(member => !member.user.bot)
+        .sort((a, b) => {
+          const first =
+            a.joinedTimestamp || Infinity;
+
+          const second =
+            b.joinedTimestamp || Infinity;
+
+          return first - second;
+        });
+
+    const index =
+      humans.findIndex(
+        member =>
+          member.id === targetMember.id
+      );
+
+    if (index === -1) {
+      return humans.length;
+    }
+
+    return index + 1;
+
+  } catch (error) {
+    console.error(
+      "⚠️ تعذر حساب رقم العضو:",
+      error
+    );
+
+    return 1;
+  }
+}
+
+/* =====================================================
    إنشاء صورة DNA
 ===================================================== */
 
@@ -323,9 +321,9 @@ async function createDNAImage(
   const width = 1000;
   const height = 600;
 
-  /* ---------------------------------------------
+  /* ===================================================
      صورة العضو
-  --------------------------------------------- */
+  =================================================== */
 
   const avatarURL =
     member.user.displayAvatarURL({
@@ -343,7 +341,7 @@ async function createDNAImage(
       avatarBuffer =
         await response.arrayBuffer();
     }
-  } catch (error) {
+  } catch {
     avatarBuffer = null;
   }
 
@@ -354,12 +352,12 @@ async function createDNAImage(
         ).toString("base64")
       : "";
 
-  /* ---------------------------------------------
-     مدة العضوية
-  --------------------------------------------- */
+  /* ===================================================
+     مدة العضوية الحقيقية
+  =================================================== */
 
   const membership =
-    getMembershipParts(
+    getMembershipTime(
       member.joinedAt
     );
 
@@ -369,9 +367,18 @@ async function createDNAImage(
   const hours =
     membership.hours;
 
-  /* ---------------------------------------------
+  /* ===================================================
+     الرسائل
+  =================================================== */
+
+  const messages =
+    memberData.messages.toLocaleString(
+      "en-US"
+    );
+
+  /* ===================================================
      وقت المكالمات
-  --------------------------------------------- */
+  =================================================== */
 
   const voiceSeconds =
     memberData.voiceSeconds +
@@ -391,36 +398,27 @@ async function createDNAImage(
       voiceSeconds
     );
 
-  /* ---------------------------------------------
-     الرسائل
-  --------------------------------------------- */
-
-  const messages =
-    memberData.messages.toLocaleString(
-      "en-US"
-    );
-
-  /* ---------------------------------------------
+  /* ===================================================
      اسم العضو
-  --------------------------------------------- */
+  =================================================== */
 
   const username =
     escapeXML(
       member.user.username
     );
 
-  /* ---------------------------------------------
+  /* ===================================================
      عمر الحساب
-  --------------------------------------------- */
+  =================================================== */
 
-  const account =
+  const accountAge =
     getAccountAge(
       member.user.createdAt
     );
 
-  /* ---------------------------------------------
+  /* ===================================================
      عدد الرتب
-  --------------------------------------------- */
+  =================================================== */
 
   const roleCount =
     Math.max(
@@ -428,16 +426,16 @@ async function createDNAImage(
       member.roles.cache.size - 1
     );
 
-  /* ---------------------------------------------
-     الحالة
-  --------------------------------------------- */
+  /* ===================================================
+     حالة العضو
+  =================================================== */
 
   const status =
     getMemberStatus(member);
 
-  /* ---------------------------------------------
-     صورة العضو داخل الدائرة
-  --------------------------------------------- */
+  /* ===================================================
+     صورة العضو
+  =================================================== */
 
   const avatarCircle =
     avatarBase64
@@ -464,9 +462,9 @@ async function createDNAImage(
       `
       : "";
 
-  /* =================================================
-     تصميم الصورة
-  ================================================= */
+  /* ===================================================
+     الصورة
+  =================================================== */
 
   const svg = `
   <svg
@@ -503,7 +501,7 @@ async function createDNAImage(
         />
       </linearGradient>
 
-      <!-- الخط الأحمر -->
+      <!-- الأحمر -->
 
       <linearGradient
         id="redLine"
@@ -514,7 +512,7 @@ async function createDNAImage(
       >
         <stop
           offset="0%"
-          stop-color="#550000"
+          stop-color="#4b0000"
         />
 
         <stop
@@ -524,13 +522,14 @@ async function createDNAImage(
 
         <stop
           offset="100%"
-          stop-color="#550000"
+          stop-color="#4b0000"
         />
       </linearGradient>
 
       <!-- توهج -->
 
-      <filter id="redGlow">
+      <filter id="glow">
+
         <feGaussianBlur
           stdDeviation="7"
           result="blur"
@@ -540,18 +539,21 @@ async function createDNAImage(
           <feMergeNode in="blur"/>
           <feMergeNode in="SourceGraphic"/>
         </feMerge>
+
       </filter>
 
       <!-- ظل -->
 
       <filter id="shadow">
+
         <feDropShadow
           dx="0"
           dy="5"
           stdDeviation="7"
           flood-color="#000000"
-          flood-opacity="0.7"
+          flood-opacity="0.75"
         />
+
       </filter>
 
     </defs>
@@ -571,14 +573,14 @@ async function createDNAImage(
       cx="900"
       cy="80"
       r="190"
-      fill="#a00000"
+      fill="#9b0000"
       opacity="0.08"
     />
 
     <circle
-      cx="30"
-      cy="540"
-      r="200"
+      cx="20"
+      cy="550"
+      r="210"
       fill="#ff0000"
       opacity="0.035"
     />
@@ -614,7 +616,7 @@ async function createDNAImage(
 
     <text
       x="500"
-      y="89"
+      y="90"
       text-anchor="middle"
       fill="#666666"
       font-family="Arial"
@@ -624,13 +626,13 @@ async function createDNAImage(
     </text>
 
     <!-- =================================================
-         الصورة
+         صورة العضو
     ================================================= -->
 
     <circle
       cx="135"
       cy="135"
-      r="96"
+      r="97"
       fill="#080000"
       stroke="#430000"
       stroke-width="2"
@@ -643,18 +645,18 @@ async function createDNAImage(
       fill="none"
       stroke="#ff1515"
       stroke-width="4"
-      filter="url(#redGlow)"
+      filter="url(#glow)"
     />
 
     ${avatarCircle}
 
     <!-- =================================================
-         اسم العضو
+         معلومات العضو
     ================================================= -->
 
     <text
       x="270"
-      y="120"
+      y="119"
       fill="#ffffff"
       font-family="Arial"
       font-size="31"
@@ -665,7 +667,7 @@ async function createDNAImage(
 
     <text
       x="270"
-      y="148"
+      y="147"
       fill="#777777"
       font-family="Arial"
       font-size="15"
@@ -701,14 +703,14 @@ async function createDNAImage(
 
     <circle
       cx="275"
-      cy="201"
+      cy="202"
       r="6"
       fill="${status.color}"
     />
 
     <text
       x="290"
-      y="206"
+      y="207"
       fill="#888888"
       font-family="Arial"
       font-size="14"
@@ -718,7 +720,7 @@ async function createDNAImage(
 
     <text
       x="350"
-      y="206"
+      y="207"
       fill="${status.color}"
       font-family="Arial"
       font-size="14"
@@ -728,7 +730,7 @@ async function createDNAImage(
     </text>
 
     <!-- =================================================
-         الكارت الأول
+         بطاقة مدة العضوية
     ================================================= -->
 
     <rect
@@ -744,8 +746,9 @@ async function createDNAImage(
     />
 
     <text
-      x="75"
+      x="192"
       y="262"
+      text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
       font-size="18"
@@ -755,8 +758,9 @@ async function createDNAImage(
     </text>
 
     <text
-      x="75"
-      y="290"
+      x="192"
+      y="289"
+      text-anchor="middle"
       fill="#777777"
       font-family="Arial"
       font-size="14"
@@ -764,54 +768,75 @@ async function createDNAImage(
       داخل السيرفر منذ
     </text>
 
-    <!-- الأيام -->
+    <!-- الأيام والساعات
+         منفصلة لمنع انقلاب ترتيب العربي -->
 
     <text
       x="75"
-      y="327"
+      y="335"
       fill="#ffffff"
       font-family="Arial"
-      font-size="25"
+      font-size="23"
       font-weight="bold"
     >
       ${days}
     </text>
 
     <text
-      x="125"
-      y="327"
+      x="120"
+      y="335"
       fill="#aaaaaa"
       font-family="Arial"
-      font-size="20"
+      font-size="19"
     >
       يوم
     </text>
 
-    <!-- الساعات -->
+    <text
+      x="165"
+      y="335"
+      fill="#ff2020"
+      font-family="Arial"
+      font-size="19"
+      font-weight="bold"
+    >
+      و
+    </text>
 
     <text
-      x="75"
-      y="356"
+      x="195"
+      y="335"
       fill="#ffffff"
       font-family="Arial"
-      font-size="22"
+      font-size="23"
       font-weight="bold"
     >
       ${hours}
     </text>
 
     <text
-      x="120"
-      y="356"
+      x="240"
+      y="335"
       fill="#aaaaaa"
       font-family="Arial"
-      font-size="18"
+      font-size="19"
     >
       ساعة
     </text>
 
+    <text
+      x="192"
+      y="365"
+      text-anchor="middle"
+      fill="#555555"
+      font-family="Arial"
+      font-size="12"
+    >
+      يتم تحديث المدة تلقائياً
+    </text>
+
     <!-- =================================================
-         الكارت الثاني
+         بطاقة الرسائل
     ================================================= -->
 
     <rect
@@ -827,8 +852,9 @@ async function createDNAImage(
     />
 
     <text
-      x="382"
+      x="500"
       y="262"
+      text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
       font-size="18"
@@ -838,8 +864,9 @@ async function createDNAImage(
     </text>
 
     <text
-      x="382"
-      y="290"
+      x="500"
+      y="289"
+      text-anchor="middle"
       fill="#777777"
       font-family="Arial"
       font-size="14"
@@ -848,8 +875,9 @@ async function createDNAImage(
     </text>
 
     <text
-      x="382"
+      x="500"
       y="337"
+      text-anchor="middle"
       fill="#ffffff"
       font-family="Arial"
       font-size="30"
@@ -859,17 +887,18 @@ async function createDNAImage(
     </text>
 
     <text
-      x="382"
+      x="500"
       y="365"
-      fill="#777777"
+      text-anchor="middle"
+      fill="#555555"
       font-family="Arial"
-      font-size="13"
+      font-size="12"
     >
       رسالة
     </text>
 
     <!-- =================================================
-         الكارت الثالث
+         بطاقة المكالمات
     ================================================= -->
 
     <rect
@@ -885,8 +914,9 @@ async function createDNAImage(
     />
 
     <text
-      x="690"
+      x="807"
       y="262"
+      text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
       font-size="18"
@@ -896,8 +926,9 @@ async function createDNAImage(
     </text>
 
     <text
-      x="690"
-      y="290"
+      x="807"
+      y="289"
+      text-anchor="middle"
       fill="#777777"
       font-family="Arial"
       font-size="14"
@@ -906,14 +937,26 @@ async function createDNAImage(
     </text>
 
     <text
-      x="690"
+      x="807"
       y="337"
+      text-anchor="middle"
       fill="#ffffff"
       font-family="Arial"
-      font-size="23"
+      font-size="21"
       font-weight="bold"
     >
       ${voiceTime}
+    </text>
+
+    <text
+      x="807"
+      y="365"
+      text-anchor="middle"
+      fill="#555555"
+      font-family="Arial"
+      font-size="12"
+    >
+      وقت المكالمات المسجل
     </text>
 
     <!-- =================================================
@@ -936,8 +979,9 @@ async function createDNAImage(
     <!-- عمر الحساب -->
 
     <text
-      x="75"
-      y="448"
+      x="150"
+      y="447"
+      text-anchor="middle"
       fill="#777777"
       font-family="Arial"
       font-size="13"
@@ -946,31 +990,22 @@ async function createDNAImage(
     </text>
 
     <text
-      x="75"
+      x="150"
       y="475"
+      text-anchor="middle"
       fill="#ffffff"
       font-family="Arial"
-      font-size="17"
+      font-size="18"
       font-weight="bold"
     >
-      ${account.value}
-    </text>
-
-    <text
-      x="125"
-      y="475"
-      fill="#aaaaaa"
-      font-family="Arial"
-      font-size="15"
-    >
-      ${account.unit}
+      ${accountAge.number} ${accountAge.text}
     </text>
 
     <!-- عدد الرتب -->
 
     <text
       x="500"
-      y="448"
+      y="447"
       text-anchor="middle"
       fill="#777777"
       font-family="Arial"
@@ -988,15 +1023,15 @@ async function createDNAImage(
       font-size="18"
       font-weight="bold"
     >
-      ${roleCount}
+      ${roleCount} رتبة
     </text>
 
-    <!-- رقم العضو -->
+    <!-- ترتيب العضو -->
 
     <text
-      x="925"
-      y="448"
-      text-anchor="end"
+      x="850"
+      y="447"
+      text-anchor="middle"
       fill="#777777"
       font-family="Arial"
       font-size="13"
@@ -1005,9 +1040,9 @@ async function createDNAImage(
     </text>
 
     <text
-      x="925"
+      x="850"
       y="475"
-      text-anchor="end"
+      text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
       font-size="18"
@@ -1017,7 +1052,7 @@ async function createDNAImage(
     </text>
 
     <!-- =================================================
-         أسفل الصورة
+         أسفل البطاقة
     ================================================= -->
 
     <text
@@ -1026,7 +1061,7 @@ async function createDNAImage(
       text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
-      font-size="19"
+      font-size="20"
       font-weight="bold"
     >
       عصابة نيون
@@ -1034,7 +1069,7 @@ async function createDNAImage(
 
     <text
       x="500"
-      y="550"
+      y="551"
       text-anchor="middle"
       fill="#555555"
       font-family="Arial"
@@ -1054,7 +1089,7 @@ async function createDNAImage(
 }
 
 /* =====================================================
-   أمر /dna
+   أمر DNA
 ===================================================== */
 
 const commands = [
@@ -1076,7 +1111,7 @@ const commands = [
 );
 
 /* =====================================================
-   عند تشغيل البوت
+   تشغيل البوت
 ===================================================== */
 
 client.once(
@@ -1114,7 +1149,7 @@ client.once(
     } catch (error) {
 
       console.error(
-        "❌ حدث خطأ أثناء تسجيل الأمر:",
+        "❌ خطأ في تسجيل الأمر:",
         error
       );
     }
@@ -1122,7 +1157,7 @@ client.once(
 );
 
 /* =====================================================
-   حساب الرسائل
+   عداد الرسائل
 ===================================================== */
 
 client.on(
@@ -1172,10 +1207,10 @@ client.on(
       );
 
     const wasInVoice =
-      !!oldState.channelId;
+      Boolean(oldState.channelId);
 
     const isInVoice =
-      !!newState.channelId;
+      Boolean(newState.channelId);
 
     /* دخول المكالمة */
 
@@ -1221,7 +1256,7 @@ client.on(
 );
 
 /* =====================================================
-   أوامر التفاعل
+   تنفيذ أمر DNA
 ===================================================== */
 
 client.on(
@@ -1244,7 +1279,7 @@ client.on(
 
       await interaction.deferReply();
 
-      /* العضو المطلوب */
+      /* العضو المحدد */
 
       const selectedUser =
         interaction.options.getUser(
@@ -1292,7 +1327,7 @@ client.on(
           memberNumber
         );
 
-      /* الصورة المرفقة */
+      /* إرسال الصورة */
 
       const attachment =
         new AttachmentBuilder(
@@ -1309,7 +1344,7 @@ client.on(
     } catch (error) {
 
       console.error(
-        "❌ حدث خطأ في أمر DNA:",
+        "❌ خطأ في أمر DNA:",
         error
       );
 
@@ -1362,7 +1397,7 @@ process.on(
 );
 
 /* =====================================================
-   تشغيل تسجيل الدخول
+   تسجيل الدخول
 ===================================================== */
 
 console.log(
