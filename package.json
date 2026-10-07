@@ -1,16 +1,13 @@
 {
-  "name": "neon-dna",
-  "version": "2.0.0",
-  "description": "NEON DNA Discord member profile card",
+  "name": "neon-discord-bot",
+  "version": "1.0.0",
+  "description": "NEON Discord Member DNA Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "engines": {
-    "node": ">=18.17.0"
-  },
   "dependencies": {
-    "discord.js": "^14.21.0",
+    "discord.js": "^14.24.2",
     "sharp": "^0.34.3"
   }
 }
