@@ -17,7 +17,15 @@ const sharp = require('sharp');
 // ======================================================
 
 const CLIENT_ID = '1557370938650271824';
+
 const DNA_CHANNEL_ID = '1557391771527553125';
+
+// ======================================================
+// OWNER
+// ======================================================
+
+const OWNER_ID = '1509551287623094283';
+
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
@@ -56,6 +64,10 @@ if (fs.existsSync(DATA_FILE)) {
 
 let saveTimer = null;
 
+// ======================================================
+// MEMBER DATA
+// ======================================================
+
 function getMemberData(guildId, userId) {
 
   if (!data[guildId]) {
@@ -71,7 +83,6 @@ function getMemberData(guildId, userId) {
     };
   }
 
-  // دعم البيانات القديمة
   if (
     !Object.prototype.hasOwnProperty.call(
       data[guildId][userId],
@@ -84,9 +95,45 @@ function getMemberData(guildId, userId) {
   return data[guildId][userId];
 }
 
+// ======================================================
+// ALLOWED DNA USERS
+// ======================================================
+
+function getAllowedUsers(guildId) {
+
+  if (!data[guildId]) {
+    data[guildId] = {};
+  }
+
+  if (!data[guildId].allowedDNAUsers) {
+    data[guildId].allowedDNAUsers = [];
+  }
+
+  return data[guildId].allowedDNAUsers;
+}
+
+function isAllowedToWrite(guildId, userId) {
+
+  // الـOwner مسموح له دائمًا
+  if (userId === OWNER_ID) {
+    return true;
+  }
+
+  const allowedUsers =
+    getAllowedUsers(guildId);
+
+  return allowedUsers.includes(userId);
+}
+
+// ======================================================
+// SAVE
+// ======================================================
+
 function saveSoon() {
 
-  if (saveTimer) return;
+  if (saveTimer) {
+    return;
+  }
 
   saveTimer = setTimeout(() => {
 
@@ -96,7 +143,11 @@ function saveSoon() {
 
       fs.writeFileSync(
         DATA_FILE,
-        JSON.stringify(data, null, 2),
+        JSON.stringify(
+          data,
+          null,
+          2
+        ),
         'utf8'
       );
 
@@ -106,6 +157,7 @@ function saveSoon() {
         '❌ خطأ في حفظ البيانات:',
         error
       );
+
     }
 
   }, 3000);
@@ -117,7 +169,11 @@ function saveNow() {
 
     fs.writeFileSync(
       DATA_FILE,
-      JSON.stringify(data, null, 2),
+      JSON.stringify(
+        data,
+        null,
+        2
+      ),
       'utf8'
     );
 
@@ -127,6 +183,7 @@ function saveNow() {
       '❌ خطأ في حفظ البيانات:',
       error
     );
+
   }
 }
 
@@ -175,12 +232,10 @@ function formatDate(date) {
   }
 
   const day =
-    String(date.getDate())
-      .padStart(2, '0');
+    String(date.getDate()).padStart(2, '0');
 
   const month =
-    String(date.getMonth() + 1)
-      .padStart(2, '0');
+    String(date.getMonth() + 1).padStart(2, '0');
 
   const year =
     date.getFullYear();
@@ -201,10 +256,14 @@ function getAccountAge(createdAt) {
   const now = new Date();
 
   let months =
-    (now.getFullYear() -
-      createdAt.getFullYear()) * 12 +
-    (now.getMonth() -
-      createdAt.getMonth());
+    (
+      now.getFullYear() -
+      createdAt.getFullYear()
+    ) * 12 +
+    (
+      now.getMonth() -
+      createdAt.getMonth()
+    );
 
   if (
     now.getDate() <
@@ -213,8 +272,7 @@ function getAccountAge(createdAt) {
     months--;
   }
 
-  months =
-    Math.max(0, months);
+  months = Math.max(0, months);
 
   if (months >= 12) {
 
@@ -225,18 +283,14 @@ function getAccountAge(createdAt) {
       months % 12;
 
     if (remainingMonths > 0) {
-
       return `${years} سنة و ${remainingMonths} شهر`;
-
     }
 
     return `${years} سنة`;
   }
 
   if (months > 0) {
-
     return `${months} شهور`;
-
   }
 
   return 'أقل من شهر';
@@ -255,8 +309,7 @@ function getMembershipTime(joinedAt) {
   const difference =
     Math.max(
       0,
-      Date.now() -
-      joinedAt.getTime()
+      Date.now() - joinedAt.getTime()
     );
 
   const totalHours =
@@ -265,9 +318,7 @@ function getMembershipTime(joinedAt) {
     );
 
   const days =
-    Math.floor(
-      totalHours / 24
-    );
+    Math.floor(totalHours / 24);
 
   const hours =
     totalHours % 24;
@@ -276,7 +327,7 @@ function getMembershipTime(joinedAt) {
 }
 
 // ======================================================
-// VOICE TIME
+// VOICE
 // ======================================================
 
 function formatVoiceTime(seconds) {
@@ -284,29 +335,21 @@ function formatVoiceTime(seconds) {
   seconds =
     Math.max(
       0,
-      Math.floor(
-        Number(seconds) || 0
-      )
+      Math.floor(Number(seconds) || 0)
     );
 
   const days =
-    Math.floor(
-      seconds / 86400
-    );
+    Math.floor(seconds / 86400);
 
   seconds %= 86400;
 
   const hours =
-    Math.floor(
-      seconds / 3600
-    );
+    Math.floor(seconds / 3600);
 
   seconds %= 3600;
 
   const minutes =
-    Math.floor(
-      seconds / 60
-    );
+    Math.floor(seconds / 60);
 
   if (days > 0) {
 
@@ -396,16 +439,12 @@ async function getMemberNumber(
           (a, b) => {
 
             const aTime =
-              a.joinedTimestamp ||
-              Infinity;
+              a.joinedTimestamp || Infinity;
 
             const bTime =
-              b.joinedTimestamp ||
-              Infinity;
+              b.joinedTimestamp || Infinity;
 
-            if (
-              aTime === bTime
-            ) {
+            if (aTime === bTime) {
 
               return a.id.localeCompare(
                 b.id
@@ -414,15 +453,13 @@ async function getMemberNumber(
             }
 
             return aTime - bTime;
-
           }
         );
 
     const index =
       humans.findIndex(
         member =>
-          member.id ===
-          target.id
+          member.id === target.id
       );
 
     return index >= 0
@@ -500,7 +537,7 @@ async function getAvatar(member) {
 }
 
 // ======================================================
-// MAIN CARD
+// DNA IMAGE
 // ======================================================
 
 async function createDNAImage(
@@ -559,26 +596,18 @@ async function createDNAImage(
     );
 
   const messages =
-    Number(
-      memberData.messages || 0
-    );
+    Number(memberData.messages || 0);
 
   let voiceSeconds =
-    Number(
-      memberData.voiceSeconds || 0
-    );
+    Number(memberData.voiceSeconds || 0);
 
-  if (
-    memberData.voiceStarted
-  ) {
+  if (memberData.voiceStarted) {
 
     voiceSeconds +=
       Math.floor(
         (
           Date.now() -
-          Number(
-            memberData.voiceStarted
-          )
+          Number(memberData.voiceStarted)
         ) / 1000
       );
 
@@ -596,13 +625,7 @@ async function createDNAImage(
     escapeXML(username);
 
   const safeID =
-    escapeXML(
-      member.user.id
-    );
-
-  // ====================================================
-  // BOX
-  // ====================================================
+    escapeXML(member.user.id);
 
   function bigBox(
     x,
@@ -751,10 +774,6 @@ async function createDNAImage(
     `;
   }
 
-  // ====================================================
-  // SVG
-  // ====================================================
-
   const svg = `
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -832,16 +851,12 @@ async function createDNAImage(
 
     </defs>
 
-    <!-- BACKGROUND -->
-
     <rect
       width="1400"
       height="1400"
       rx="45"
       fill="url(#background)"
     />
-
-    <!-- OUTER FRAME -->
 
     <path
       d="
@@ -873,8 +888,6 @@ async function createDNAImage(
       filter="url(#redGlow)"
     />
 
-    <!-- HEADER -->
-
     <text
       x="78"
       y="62"
@@ -886,8 +899,6 @@ async function createDNAImage(
       ♛ NEON
     </text>
 
-    <!-- الكلام الموجود أعلى اليمين تم حذفه -->
-
     <rect
       x="70"
       y="112"
@@ -896,10 +907,6 @@ async function createDNAImage(
       fill="#ff1728"
       filter="url(#redGlow)"
     />
-
-    <!-- ==================================================
-         TOP PROFILE
-         ================================================== -->
 
     <rect
       x="65"
@@ -910,8 +917,6 @@ async function createDNAImage(
       stroke="#72000b"
       stroke-width="1"
     />
-
-    <!-- ================= AVATAR ================= -->
 
     <circle
       cx="195"
@@ -977,8 +982,6 @@ async function createDNAImage(
       `
     }
 
-    <!-- ================= STATUS DOT ================= -->
-
     <circle
       cx="274"
       cy="357"
@@ -994,8 +997,6 @@ async function createDNAImage(
       r="10"
       fill="${status.color}"
     />
-
-    <!-- ================= NAME ================= -->
 
     <text
       x="335"
@@ -1017,8 +1018,6 @@ async function createDNAImage(
     >
       #${safeUsername}
     </text>
-
-    <!-- ================= PROFILE BOX ================= -->
 
     <path
       d="
@@ -1082,10 +1081,6 @@ async function createDNAImage(
       بيانات وإحصائيات العضو
     </text>
 
-    <!-- ==================================================
-         MAIN STATS
-         ================================================== -->
-
     ${bigBox(
       65,
       425,
@@ -1112,10 +1107,6 @@ async function createDNAImage(
       'إجمالي وقت وجود العضو في الفويس',
       voice
     )}
-
-    <!-- ==================================================
-         SECOND ROW
-         ================================================== -->
 
     ${smallBox(
       65,
@@ -1149,10 +1140,6 @@ async function createDNAImage(
       accountAge
     )}
 
-    <!-- ==================================================
-         THIRD ROW
-         ================================================== -->
-
     ${smallBox(
       65,
       825,
@@ -1177,10 +1164,6 @@ async function createDNAImage(
       accountDate
     )}
 
-    <!-- ==================================================
-         BOTTOM
-         ================================================== -->
-
     ${smallBox(
       65,
       1005,
@@ -1196,10 +1179,6 @@ async function createDNAImage(
       'اسم المستخدم',
       safeUsername
     )}
-
-    <!-- ==================================================
-         FOOTER
-         ================================================== -->
 
     <rect
       x="65"
@@ -1244,18 +1223,55 @@ async function createDNAImage(
 }
 
 // ======================================================
-// SLASH COMMAND
+// SLASH COMMANDS
 // ======================================================
 
 const commands = [
+
   new SlashCommandBuilder()
     .setName('dna')
     .setDescription(
       'عرض بطاقة NEON DNA وإحصائيات العضو'
+    ),
+
+  new SlashCommandBuilder()
+    .setName('allow')
+    .setDescription(
+      'السماح لعضو بالكتابة في قناة DNA'
     )
+    .addUserOption(
+      option =>
+        option
+          .setName('member')
+          .setDescription(
+            'العضو الذي تريد السماح له'
+          )
+          .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('deny')
+    .setDescription(
+      'منع عضو من الكتابة في قناة DNA'
+    )
+    .addUserOption(
+      option =>
+        option
+          .setName('member')
+          .setDescription(
+            'العضو الذي تريد منعه'
+          )
+          .setRequired(true)
+    )
+
 ].map(
-  command => command.toJSON()
+  command =>
+    command.toJSON()
 );
+
+// ======================================================
+// REGISTER
+// ======================================================
 
 const rest =
   new REST({
@@ -1267,7 +1283,7 @@ async function registerCommands() {
   try {
 
     console.log(
-      '🔄 جاري تسجيل /dna...'
+      '🔄 جاري تسجيل أوامر البوت...'
     );
 
     await rest.put(
@@ -1280,13 +1296,13 @@ async function registerCommands() {
     );
 
     console.log(
-      '✅ تم تسجيل /dna.'
+      '✅ تم تسجيل الأوامر.'
     );
 
   } catch (error) {
 
     console.error(
-      '❌ خطأ في تسجيل الأمر:',
+      '❌ خطأ في تسجيل الأوامر:',
       error
     );
 
@@ -1307,6 +1323,10 @@ client.once(
 
     console.log(
       `📌 قناة DNA: ${DNA_CHANNEL_ID}`
+    );
+
+    console.log(
+      `👑 Owner ID: ${OWNER_ID}`
     );
 
     await registerCommands();
@@ -1331,9 +1351,7 @@ client.once(
             member.id
           );
 
-        if (
-          member.voice?.channelId
-        ) {
+        if (member.voice?.channelId) {
 
           memberData.voiceStarted =
             Date.now();
@@ -1352,12 +1370,12 @@ client.once(
 );
 
 // ======================================================
-// MESSAGE COUNTER
+// MESSAGE COUNTER + DNA CHANNEL
 // ======================================================
 
 client.on(
   'messageCreate',
-  message => {
+  async message => {
 
     if (
       !message.guild ||
@@ -1366,6 +1384,48 @@ client.on(
       return;
     }
 
+    // قناة DNA
+    if (
+      message.channel.id ===
+      DNA_CHANNEL_ID
+    ) {
+
+      // Owner يكتب عادي
+      if (
+        message.author.id ===
+        OWNER_ID
+      ) {
+        return;
+      }
+
+      // الأعضاء المسموح لهم يكتبوا عادي
+      if (
+        isAllowedToWrite(
+          message.guild.id,
+          message.author.id
+        )
+      ) {
+        return;
+      }
+
+      // أي عضو غير مسموح → حذف الرسالة
+      try {
+
+        await message.delete();
+
+      } catch (error) {
+
+        console.error(
+          '❌ لم أستطع حذف رسالة DNA:',
+          error
+        );
+
+      }
+
+      return;
+    }
+
+    // عداد الرسائل
     const memberData =
       getMemberData(
         message.guild.id,
@@ -1384,15 +1444,16 @@ client.on(
 
 client.on(
   'voiceStateUpdate',
-  (oldState, newState) => {
+  (
+    oldState,
+    newState
+  ) => {
 
     if (!newState.guild) {
       return;
     }
 
-    if (
-      newState.member?.user?.bot
-    ) {
+    if (newState.member?.user?.bot) {
       return;
     }
 
@@ -1402,8 +1463,7 @@ client.on(
         newState.id
       );
 
-    // دخل الفويس
-
+    // دخول فويس
     if (
       !oldState.channelId &&
       newState.channelId
@@ -1417,16 +1477,13 @@ client.on(
       return;
     }
 
-    // خرج من الفويس
-
+    // خروج من فويس
     if (
       oldState.channelId &&
       !newState.channelId
     ) {
 
-      if (
-        memberData.voiceStarted
-      ) {
+      if (memberData.voiceStarted) {
 
         memberData.voiceSeconds +=
           Math.max(
@@ -1442,16 +1499,14 @@ client.on(
           );
       }
 
-      memberData.voiceStarted =
-        null;
+      memberData.voiceStarted = null;
 
       saveSoon();
 
       return;
     }
 
-    // نقل من روم إلى روم
-
+    // نقل من روم لروم
     if (
       oldState.channelId &&
       newState.channelId &&
@@ -1459,9 +1514,7 @@ client.on(
         newState.channelId
     ) {
 
-      if (
-        !memberData.voiceStarted
-      ) {
+      if (!memberData.voiceStarted) {
 
         memberData.voiceStarted =
           Date.now();
@@ -1474,21 +1527,146 @@ client.on(
 );
 
 // ======================================================
-// /DNA
+// INTERACTIONS
 // ======================================================
 
 client.on(
   'interactionCreate',
   async interaction => {
 
-    if (
-      !interaction.isChatInputCommand()
-    ) {
+    if (!interaction.isChatInputCommand()) {
       return;
     }
 
+    // ==================================================
+    // /ALLOW
+    // ==================================================
+
     if (
-      interaction.commandName !== 'dna'
+      interaction.commandName ===
+      'allow'
+    ) {
+
+      if (
+        interaction.user.id !==
+        OWNER_ID
+      ) {
+
+        return interaction.reply({
+          content:
+            '❌ هذا الأمر للـOwner فقط.',
+          flags:
+            MessageFlags.Ephemeral
+        });
+      }
+
+      const user =
+        interaction.options.getUser(
+          'member'
+        );
+
+      const allowedUsers =
+        getAllowedUsers(
+          interaction.guild.id
+        );
+
+      if (
+        allowedUsers.includes(
+          user.id
+        )
+      ) {
+
+        return interaction.reply({
+          content:
+            `⚠️ <@${user.id}> مسموح له بالفعل بالكتابة.`,
+          flags:
+            MessageFlags.Ephemeral
+        });
+      }
+
+      allowedUsers.push(
+        user.id
+      );
+
+      saveSoon();
+
+      return interaction.reply({
+        content:
+          `✅ تم السماح لـ <@${user.id}> بالكتابة في قناة الـDNA.`,
+        flags:
+          MessageFlags.Ephemeral
+      });
+    }
+
+    // ==================================================
+    // /DENY
+    // ==================================================
+
+    if (
+      interaction.commandName ===
+      'deny'
+    ) {
+
+      if (
+        interaction.user.id !==
+        OWNER_ID
+      ) {
+
+        return interaction.reply({
+          content:
+            '❌ هذا الأمر للـOwner فقط.',
+          flags:
+            MessageFlags.Ephemeral
+        });
+      }
+
+      const user =
+        interaction.options.getUser(
+          'member'
+        );
+
+      const allowedUsers =
+        getAllowedUsers(
+          interaction.guild.id
+        );
+
+      const index =
+        allowedUsers.indexOf(
+          user.id
+        );
+
+      if (index === -1) {
+
+        return interaction.reply({
+          content:
+            `⚠️ <@${user.id}> غير مسموح له بالكتابة أصلًا.`,
+          flags:
+            MessageFlags.Ephemeral
+        });
+      }
+
+      allowedUsers.splice(
+        index,
+        1
+      );
+
+      saveSoon();
+
+      return interaction.reply({
+        content:
+          `🔴 تم منع <@${user.id}> من الكتابة في قناة الـDNA.`,
+        flags:
+          MessageFlags.Ephemeral
+      });
+    }
+
+    // ==================================================
+    // /DNA
+    // ==================================================
+
+    if (
+      interaction.commandName !==
+      'dna'
     ) {
       return;
     }
@@ -1512,8 +1690,10 @@ client.on(
 
       const member =
         await interaction.guild.members.fetch({
-          user: interaction.user.id,
-          force: true
+          user:
+            interaction.user.id,
+          force:
+            true
         });
 
       const memberData =
@@ -1522,10 +1702,7 @@ client.on(
           member.id
         );
 
-      // ==================================================
       // حذف البطاقة القديمة لنفس العضو فقط
-      // ==================================================
-
       if (
         memberData.dnaMessageId
       ) {
@@ -1544,30 +1721,19 @@ client.on(
           ) {
 
             await oldMessage.delete();
-
           }
 
-        } catch {
-          // البطاقة القديمة غير موجودة
-        }
+        } catch {}
 
         memberData.dnaMessageId =
           null;
       }
-
-      // ==================================================
-      // MEMBER NUMBER
-      // ==================================================
 
       const memberNumber =
         await getMemberNumber(
           interaction.guild,
           member
         );
-
-      // ==================================================
-      // CREATE IMAGE
-      // ==================================================
 
       const image =
         await createDNAImage(
@@ -1585,17 +1751,9 @@ client.on(
           }
         );
 
-      // ==================================================
-      // SEND CARD
-      // ==================================================
-
       await interaction.editReply({
         files: [file]
       });
-
-      // ==================================================
-      // SAVE NEW MESSAGE ID
-      // ==================================================
 
       const newMessage =
         await interaction.fetchReply();
@@ -1625,7 +1783,7 @@ client.on(
 );
 
 // ======================================================
-// SAFE SHUTDOWN
+// SHUTDOWN
 // ======================================================
 
 process.on(
@@ -1669,7 +1827,6 @@ process.on(
       '❌ unhandledRejection:',
       error
     );
-
   }
 );
 
