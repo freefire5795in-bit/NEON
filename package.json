@@ -1,9 +1,13 @@
 {
   "name": "neon-dna",
   "version": "1.0.0",
+  "description": "NEON Discord Member DNA Card Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "discord.js": "^14.21.0",
