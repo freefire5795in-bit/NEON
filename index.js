@@ -13,18 +13,18 @@ const path = require('path');
 const sharp = require('sharp');
 
 
-// =========================
+// ==================================================
 // الإعدادات
-// =========================
+// ==================================================
 
 const CLIENT_ID = '1557370938650271824';
 const DNA_CHANNEL_ID = '1557391771527553125';
 const TOKEN = process.env.DISCORD_TOKEN;
 
 
-// =========================
-// البوت
-// =========================
+// ==================================================
+// إنشاء البوت
+// ==================================================
 
 const client = new Client({
   intents: [
@@ -38,9 +38,9 @@ const client = new Client({
 });
 
 
-// =========================
+// ==================================================
 // ملف البيانات
-// =========================
+// ==================================================
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -49,74 +49,164 @@ let data = {
   voice: {}
 };
 
+
+// ==================================================
+// تحميل البيانات
+// ==================================================
+
 function loadData() {
   try {
     if (fs.existsSync(DATA_FILE)) {
-      data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+
+      const savedData = JSON.parse(
+        fs.readFileSync(DATA_FILE, 'utf8')
+      );
+
+      data = {
+        messages:
+          savedData &&
+          typeof savedData.messages === 'object' &&
+          savedData.messages !== null
+            ? savedData.messages
+            : {},
+
+        voice:
+          savedData &&
+          typeof savedData.voice === 'object' &&
+          savedData.voice !== null
+            ? savedData.voice
+            : {}
+      };
+
+    } else {
+
+      data = {
+        messages: {},
+        voice: {}
+      };
+
+      saveData();
     }
+
   } catch (error) {
-    console.error('❌ خطأ في قراءة data.json:', error);
+
+    console.error(
+      '❌ خطأ في قراءة data.json:',
+      error
+    );
+
+    data = {
+      messages: {},
+      voice: {}
+    };
+
+    try {
+      saveData();
+    } catch {}
   }
 }
 
+
+// ==================================================
+// حفظ البيانات
+// ==================================================
+
 function saveData() {
   try {
+
     fs.writeFileSync(
       DATA_FILE,
       JSON.stringify(data, null, 2),
       'utf8'
     );
+
   } catch (error) {
-    console.error('❌ خطأ في حفظ data.json:', error);
+
+    console.error(
+      '❌ خطأ في حفظ data.json:',
+      error
+    );
   }
 }
+
 
 loadData();
 
 
-// =========================
+// ==================================================
 // تنسيق الأرقام
-// =========================
+// ==================================================
 
 function formatNumber(number) {
   return Number(number || 0).toLocaleString('en-US');
 }
 
 
-// =========================
-// مدة زمنية
-// =========================
+// ==================================================
+// تنسيق الوقت
+// ==================================================
 
 function formatDuration(ms) {
-  if (!ms || ms < 0) return '0 ثانية';
 
-  const totalSeconds = Math.floor(ms / 1000);
+  if (!ms || ms < 0) {
+    return '0 ثانية';
+  }
 
-  const months = Math.floor(totalSeconds / (60 * 60 * 24 * 30));
-  const days = Math.floor(
-    (totalSeconds % (60 * 60 * 24 * 30)) /
-    (60 * 60 * 24)
-  );
+  const totalSeconds =
+    Math.floor(ms / 1000);
 
-  const hours = Math.floor(
-    (totalSeconds % (60 * 60 * 24)) /
-    (60 * 60)
-  );
+  const months =
+    Math.floor(
+      totalSeconds /
+      (60 * 60 * 24 * 30)
+    );
 
-  const minutes = Math.floor(
-    (totalSeconds % (60 * 60)) /
-    60
-  );
+  const days =
+    Math.floor(
+      (totalSeconds %
+        (60 * 60 * 24 * 30)) /
+      (60 * 60 * 24)
+    );
 
-  const seconds = totalSeconds % 60;
+  const hours =
+    Math.floor(
+      (totalSeconds %
+        (60 * 60 * 24)) /
+      (60 * 60)
+    );
+
+  const minutes =
+    Math.floor(
+      (totalSeconds %
+        (60 * 60)) /
+      60
+    );
+
+  const seconds =
+    totalSeconds % 60;
 
   const parts = [];
 
-  if (months) parts.push(`${months} شهر`);
-  if (days) parts.push(`${days} يوم`);
-  if (hours) parts.push(`${hours} ساعة`);
-  if (minutes) parts.push(`${minutes} دقيقة`);
-  if (seconds || parts.length === 0) {
+  if (months) {
+    parts.push(`${months} شهر`);
+  }
+
+  if (days) {
+    parts.push(`${days} يوم`);
+  }
+
+  if (hours) {
+    parts.push(`${hours} ساعة`);
+  }
+
+  if (minutes) {
+    parts.push(`${minutes} دقيقة`);
+  }
+
+  if (
+    seconds ||
+    parts.length === 0
+  ) {
     parts.push(`${seconds} ثانية`);
   }
 
@@ -124,48 +214,52 @@ function formatDuration(ms) {
 }
 
 
-// =========================
-// عمر الحساب
-// =========================
-
-function getAccountAge(createdTimestamp) {
-  return formatDuration(Date.now() - createdTimestamp);
-}
-
-
-// =========================
+// ==================================================
 // حالة العضو
-// =========================
+// ==================================================
 
 function getStatus(member) {
+
   const presence =
-    member.guild.presences.cache.get(member.id);
+    member.guild.presences.cache.get(
+      member.id
+    );
 
   const status =
     presence?.status ||
     member.presence?.status ||
     'offline';
 
+
   if (status === 'online') {
+
     return {
       text: 'متصل',
       color: '#32e875'
     };
+
   }
 
+
   if (status === 'idle') {
+
     return {
       text: 'خامل',
       color: '#f0b429'
     };
+
   }
 
+
   if (status === 'dnd') {
+
     return {
       text: 'مشغول',
       color: '#ff4141'
     };
+
   }
+
 
   return {
     text: 'غير متصل',
@@ -174,34 +268,64 @@ function getStatus(member) {
 }
 
 
-// =========================
-// رقم العضو
-// =========================
+// ==================================================
+// رقم العضو حسب ترتيب الدخول
+// ==================================================
 
-async function getMemberNumber(guild, target) {
+async function getMemberNumber(
+  guild,
+  target
+) {
+
   try {
-    const members = await guild.members.fetch();
 
-    const humans = [...members.values()]
-      .filter(member => !member.user.bot)
-      .sort((a, b) => {
-        const aTime = a.joinedTimestamp || Infinity;
-        const bTime = b.joinedTimestamp || Infinity;
+    const members =
+      await guild.members.fetch();
 
-        if (aTime === bTime) {
-          return a.id.localeCompare(b.id);
-        }
+    const humans =
+      [...members.values()]
+        .filter(
+          member => !member.user.bot
+        )
+        .sort(
+          (a, b) => {
 
-        return aTime - bTime;
-      });
+            const aTime =
+              a.joinedTimestamp ||
+              Infinity;
 
-    const index = humans.findIndex(
-      member => member.id === target.id
-    );
+            const bTime =
+              b.joinedTimestamp ||
+              Infinity;
 
-    return index >= 0 ? index + 1 : 1;
+
+            if (aTime === bTime) {
+
+              return a.id.localeCompare(
+                b.id
+              );
+
+            }
+
+
+            return aTime - bTime;
+          }
+        );
+
+
+    const index =
+      humans.findIndex(
+        member =>
+          member.id === target.id
+      );
+
+
+    return index >= 0
+      ? index + 1
+      : 1;
 
   } catch (error) {
+
     console.error(
       '❌ خطأ في حساب رقم العضو:',
       error
@@ -212,58 +336,79 @@ async function getMemberNumber(guild, target) {
 }
 
 
-// =========================
+// ==================================================
 // الأفاتار
-// =========================
+// ==================================================
 
 async function getAvatar(member) {
+
   try {
+
     return member.user.displayAvatarURL({
       extension: 'png',
       size: 512,
       forceStatic: true
     });
+
   } catch {
+
     return member.user.displayAvatarURL({
       extension: 'png',
       size: 512
     });
+
   }
 }
 
 
-// =========================
-// قص النص
-// =========================
+// ==================================================
+// تقصير النص
+// ==================================================
 
-function fitText(text, maxLength) {
-  text = String(text || '');
+function fitText(
+  text,
+  maxLength
+) {
 
-  if (text.length <= maxLength) {
+  text =
+    String(text || '');
+
+  if (
+    text.length <= maxLength
+  ) {
+
     return text;
+
   }
 
-  return text.slice(0, maxLength - 3) + '...';
+  return (
+    text.slice(
+      0,
+      maxLength - 3
+    ) + '...'
+  );
 }
 
 
-// =========================
-// تنظيف النص للـ SVG
-// =========================
+// ==================================================
+// حماية النص داخل SVG
+// ==================================================
 
 function escapeXML(text) {
+
   return String(text || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+
 }
 
 
-// =========================
-// بوكس كبير
-// =========================
+// ==================================================
+// البوكسات الكبيرة
+// ==================================================
 
 function bigBox(
   x,
@@ -273,6 +418,7 @@ function bigBox(
   value,
   icon
 ) {
+
   return `
     <path
       d="
@@ -311,9 +457,9 @@ function bigBox(
 }
 
 
-// =========================
-// بوكس صغير
-// =========================
+// ==================================================
+// البوكسات الصغيرة
+// ==================================================
 
 function smallBox(
   x,
@@ -322,6 +468,7 @@ function smallBox(
   title,
   value
 ) {
+
   return `
     <path
       d="
@@ -360,78 +507,161 @@ function smallBox(
 }
 
 
-// =========================
-// إنشاء صورة DNA
-// =========================
+// ==================================================
+// إنشاء بطاقة العضو
+// ==================================================
 
 async function createDNAImage(member) {
 
-  const avatar = await getAvatar(member);
-  const status = getStatus(member);
+  const avatar =
+    await getAvatar(member);
 
-  const name = fitText(
-    member.displayName ||
-    member.user.globalName ||
-    member.user.username,
-    20
-  );
+  const status =
+    getStatus(member);
 
-  const username = fitText(
-    member.user.username,
-    27
-  );
 
-  const safeName = escapeXML(name);
-  const safeUsername = escapeXML(username);
-  const safeID = escapeXML(member.id);
+  // الاسم
+  const name =
+    fitText(
+      member.displayName ||
+      member.user.globalName ||
+      member.user.username,
+      20
+    );
 
+
+  // اسم المستخدم
+  const username =
+    fitText(
+      member.user.username,
+      27
+    );
+
+
+  const safeName =
+    escapeXML(name);
+
+  const safeUsername =
+    escapeXML(username);
+
+  const safeID =
+    escapeXML(member.id);
+
+
+  // رقم العضو
   const memberNumber =
     await getMemberNumber(
       member.guild,
       member
     );
 
+
+  // مدة العضوية
   const membership =
     formatDuration(
-      Date.now() - (member.joinedTimestamp || Date.now())
+      Date.now() -
+      (
+        member.joinedTimestamp ||
+        Date.now()
+      )
     );
 
+
+  // عمر الحساب
   const accountAge =
-    getAccountAge(
+    formatDuration(
+      Date.now() -
       member.user.createdTimestamp
     );
 
+
+  // تاريخ الانضمام
   const joinDate =
     member.joinedAt
-      ? member.joinedAt.toLocaleDateString('en-GB')
+      ? member.joinedAt.toLocaleDateString(
+          'en-GB'
+        )
       : 'غير معروف';
 
+
+  // تاريخ إنشاء الحساب
   const accountDate =
     member.user.createdAt
-      ? member.user.createdAt.toLocaleDateString('en-GB')
+      ? member.user.createdAt.toLocaleDateString(
+          'en-GB'
+        )
       : 'غير معروف';
 
+
+  // عدد الرتب
   const roles =
     Math.max(
       0,
       member.roles.cache.filter(
-        role => role.id !== member.guild.id
+        role =>
+          role.id !== member.guild.id
       ).size
     );
 
+
+  // ==================================================
+  // البيانات - حماية من الخطأ
+  // ==================================================
+
+  if (
+    !data ||
+    typeof data !== 'object'
+  ) {
+
+    data = {
+      messages: {},
+      voice: {}
+    };
+
+  }
+
+
+  if (
+    !data.messages ||
+    typeof data.messages !== 'object'
+  ) {
+
+    data.messages = {};
+
+  }
+
+
+  if (
+    !data.voice ||
+    typeof data.voice !== 'object'
+  ) {
+
+    data.voice = {};
+
+  }
+
+
   const messages =
-    data.messages[member.id] || 0;
+    Number(
+      data.messages[member.id] || 0
+    );
+
 
   const voice =
-    data.voice[member.id] || 0;
+    Number(
+      data.voice[member.id] || 0
+    );
+
 
   const voiceText =
-    formatDuration(voice * 1000);
+    formatDuration(
+      voice * 1000
+    );
 
 
-  // ======================================
+  // ==================================================
   // SVG
-  // ======================================
+  // ==================================================
 
   const svg = `
 <svg
@@ -450,9 +680,17 @@ async function createDNAImage(member) {
       x2="0"
       y2="1"
     >
-      <stop offset="0%" stop-color="#0a0a0a"/>
-      <stop offset="100%" stop-color="#020202"/>
+      <stop
+        offset="0%"
+        stop-color="#0a0a0a"
+      />
+
+      <stop
+        offset="100%"
+        stop-color="#020202"
+      />
     </linearGradient>
+
 
     <linearGradient
       id="avatarBorder"
@@ -461,48 +699,48 @@ async function createDNAImage(member) {
       x2="1"
       y2="1"
     >
-      <stop offset="0%" stop-color="#ff2635"/>
-      <stop offset="50%" stop-color="#ff1728"/>
-      <stop offset="100%" stop-color="#7d0008"/>
+
+      <stop
+        offset="0%"
+        stop-color="#ff2635"
+      />
+
+      <stop
+        offset="50%"
+        stop-color="#ff1728"
+      />
+
+      <stop
+        offset="100%"
+        stop-color="#7d0008"
+      />
+
     </linearGradient>
 
+
     <clipPath id="avatarClip">
+
       <circle
         cx="195"
         cy="280"
         r="99"
       />
-    </clipPath>
 
-    <filter
-      id="glow"
-      x="-50%"
-      y="-50%"
-      width="200%"
-      height="200%"
-    >
-      <feGaussianBlur
-        stdDeviation="5"
-        result="blur"
-      />
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    </clipPath>
 
   </defs>
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- الخلفية -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   <rect
     width="1400"
     height="1400"
     fill="url(#bg)"
   />
+
 
   <rect
     x="35"
@@ -514,6 +752,7 @@ async function createDNAImage(member) {
     stroke="#ff1728"
     stroke-width="3"
   />
+
 
   <rect
     x="50"
@@ -527,9 +766,9 @@ async function createDNAImage(member) {
   />
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- العنوان -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   <text
     x="70"
@@ -539,6 +778,7 @@ async function createDNAImage(member) {
     font-weight="bold"
     fill="#ff2635"
   >NEON</text>
+
 
   <text
     x="1330"
@@ -550,9 +790,9 @@ async function createDNAImage(member) {
   >MEMBER DNA</text>
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- البروفايل العلوي -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   <path
     d="
@@ -572,10 +812,10 @@ async function createDNAImage(member) {
   />
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- الأفاتار
-       بدون أي تغيير -->
-  <!-- ========================= -->
+       لم يتم تغيير مكانه أو حجمه -->
+  <!-- ================================= -->
 
   <circle
     cx="195"
@@ -583,6 +823,7 @@ async function createDNAImage(member) {
     r="112"
     fill="url(#avatarBorder)"
   />
+
 
   <circle
     cx="195"
@@ -592,6 +833,7 @@ async function createDNAImage(member) {
     stroke="#ff1728"
     stroke-width="3"
   />
+
 
   <image
     href="${avatar}"
@@ -604,10 +846,10 @@ async function createDNAImage(member) {
   />
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- نقطة الحالة
-       زي ما هي -->
-  <!-- ========================= -->
+       كما هي -->
+  <!-- ================================= -->
 
   <circle
     cx="274"
@@ -618,6 +860,7 @@ async function createDNAImage(member) {
     stroke-width="3"
   />
 
+
   <circle
     cx="274"
     cy="357"
@@ -626,9 +869,9 @@ async function createDNAImage(member) {
   />
 
 
-  <!-- ========================= -->
-  <!-- الاسم + الهاشتاج -->
-  <!-- ========================= -->
+  <!-- ================================= -->
+  <!-- الاسم والهاشتاج -->
+  <!-- ================================= -->
 
   <text
     x="335"
@@ -639,6 +882,7 @@ async function createDNAImage(member) {
     fill="#f5f5f5"
   >${safeName}</text>
 
+
   <text
     x="337"
     y="289"
@@ -648,9 +892,9 @@ async function createDNAImage(member) {
   >#${safeUsername}</text>
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- ملف العضو -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   <path
     d="
@@ -669,6 +913,7 @@ async function createDNAImage(member) {
     stroke-width="2.5"
   />
 
+
   <text
     x="1025"
     y="225"
@@ -677,6 +922,7 @@ async function createDNAImage(member) {
     font-size="20"
     fill="#777777"
   >ملف العضو</text>
+
 
   <text
     x="1025"
@@ -688,6 +934,7 @@ async function createDNAImage(member) {
     fill="#f5f5f5"
   >NEON PROFILE</text>
 
+
   <text
     x="1025"
     y="330"
@@ -698,9 +945,9 @@ async function createDNAImage(member) {
   >DIGITAL MEMBER CARD</text>
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- الإحصائيات الرئيسية -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   ${bigBox(
     65,
@@ -711,6 +958,7 @@ async function createDNAImage(member) {
     '◈'
   )}
 
+
   ${bigBox(
     500,
     425,
@@ -719,6 +967,7 @@ async function createDNAImage(member) {
     formatNumber(messages),
     '✉'
   )}
+
 
   ${bigBox(
     935,
@@ -730,9 +979,9 @@ async function createDNAImage(member) {
   )}
 
 
-  <!-- ========================= -->
-  <!-- الإحصائيات الثانية -->
-  <!-- ========================= -->
+  <!-- ================================= -->
+  <!-- الإحصائيات -->
+  <!-- ================================= -->
 
   ${smallBox(
     65,
@@ -742,6 +991,7 @@ async function createDNAImage(member) {
     status.text
   )}
 
+
   ${smallBox(
     375,
     645,
@@ -750,6 +1000,7 @@ async function createDNAImage(member) {
     `#${formatNumber(memberNumber)}`
   )}
 
+
   ${smallBox(
     685,
     645,
@@ -757,6 +1008,7 @@ async function createDNAImage(member) {
     'عدد الرتب',
     `${formatNumber(roles)} رتبة`
   )}
+
 
   ${smallBox(
     995,
@@ -767,9 +1019,9 @@ async function createDNAImage(member) {
   )}
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- بيانات العضو -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   ${smallBox(
     65,
@@ -779,6 +1031,7 @@ async function createDNAImage(member) {
     name
   )}
 
+
   ${smallBox(
     500,
     825,
@@ -786,6 +1039,7 @@ async function createDNAImage(member) {
     'تاريخ الانضمام',
     joinDate
   )}
+
 
   ${smallBox(
     935,
@@ -796,9 +1050,9 @@ async function createDNAImage(member) {
   )}
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- البيانات السفلية -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   ${smallBox(
     65,
@@ -807,6 +1061,7 @@ async function createDNAImage(member) {
     'معرّف العضو',
     safeID
   )}
+
 
   ${smallBox(
     700,
@@ -817,9 +1072,9 @@ async function createDNAImage(member) {
   )}
 
 
-  <!-- ========================= -->
+  <!-- ================================= -->
   <!-- الفوتر -->
-  <!-- ========================= -->
+  <!-- ================================= -->
 
   <line
     x1="65"
@@ -830,6 +1085,7 @@ async function createDNAImage(member) {
     stroke-width="2"
   />
 
+
   <text
     x="65"
     y="1235"
@@ -837,6 +1093,7 @@ async function createDNAImage(member) {
     font-size="18"
     fill="#777777"
   >NEON • MEMBER INFORMATION SYSTEM</text>
+
 
   <text
     x="1330"
@@ -851,14 +1108,16 @@ async function createDNAImage(member) {
 `;
 
 
-  // =========================
-  // تحويل SVG إلى PNG
-  // =========================
+  // ==================================================
+  // إنشاء PNG
+  // ==================================================
 
-  const outputPath = path.join(
-    __dirname,
-    `dna-${member.id}.png`
-  );
+  const outputPath =
+    path.join(
+      __dirname,
+      `dna-${member.id}.png`
+    );
+
 
   await sharp(
     Buffer.from(svg)
@@ -866,108 +1125,178 @@ async function createDNAImage(member) {
     .png()
     .toFile(outputPath);
 
+
   return outputPath;
 }
 
 
-// =========================
-// أوامر البوت
-// =========================
+// ==================================================
+// أمر /dna
+// ==================================================
 
 const commands = [
+
   new SlashCommandBuilder()
     .setName('dna')
-    .setDescription('عرض بطاقة معلومات العضو')
+    .setDescription(
+      'عرض بطاقة معلومات العضو'
+    )
+
 ];
 
 
-// =========================
+// ==================================================
 // تسجيل الأمر
-// =========================
+// ==================================================
 
-const rest = new REST({
-  version: '10'
-}).setToken(TOKEN);
+const rest =
+  new REST({
+    version: '10'
+  }).setToken(TOKEN);
+
 
 (async () => {
+
   try {
 
-    console.log('🔄 تسجيل أوامر البوت...');
+    console.log(
+      '🔄 تسجيل أوامر البوت...'
+    );
+
 
     await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
+      Routes.applicationCommands(
+        CLIENT_ID
+      ),
       {
-        body: commands.map(
-          command => command.toJSON()
-        )
+        body:
+          commands.map(
+            command =>
+              command.toJSON()
+          )
       }
     );
 
-    console.log('✅ تم تسجيل الأوامر');
+
+    console.log(
+      '✅ تم تسجيل الأوامر'
+    );
 
   } catch (error) {
+
     console.error(
       '❌ خطأ في تسجيل الأوامر:',
       error
     );
+
   }
+
 })();
 
 
-// =========================
+// ==================================================
 // تشغيل البوت
-// =========================
+// ==================================================
 
-client.once('ready', () => {
+client.once(
+  'ready',
+  () => {
 
-  console.log(
-    `✅ تم تسجيل الدخول باسم ${client.user.tag}`
-  );
-
-  client.user.setActivity(
-    'ELZRAZIR',
-    {
-      type: 0
-    }
-  );
-
-});
+    console.log(
+      `✅ تم تسجيل الدخول باسم ${client.user.tag}`
+    );
 
 
-// =========================
-// الرسائل
-// =========================
+    client.user.setActivity(
+      'ELZRAZIR',
+      {
+        type: 0
+      }
+    );
+
+  }
+);
+
+
+// ==================================================
+// حساب الرسائل
+// ==================================================
 
 client.on(
   'messageCreate',
   message => {
 
-    if (message.author.bot) return;
+    if (message.author.bot) {
+      return;
+    }
 
-    if (!message.guild) return;
 
-    data.messages[message.author.id] =
-      (data.messages[message.author.id] || 0) + 1;
+    if (!message.guild) {
+      return;
+    }
+
+
+    // حماية إضافية
+    if (
+      !data ||
+      typeof data !== 'object'
+    ) {
+
+      data = {
+        messages: {},
+        voice: {}
+      };
+
+    }
+
+
+    if (
+      !data.messages ||
+      typeof data.messages !== 'object'
+    ) {
+
+      data.messages = {};
+
+    }
+
+
+    data.messages[
+      message.author.id
+    ] =
+      Number(
+        data.messages[
+          message.author.id
+        ] || 0
+      ) + 1;
+
 
     saveData();
+
   }
 );
 
 
-// =========================
+// ==================================================
 // الصوت
-// =========================
+// ==================================================
 
-const voiceJoinTimes = new Map();
+const voiceJoinTimes =
+  new Map();
+
 
 client.on(
   'voiceStateUpdate',
   (oldState, newState) => {
 
-    const userId = newState.id;
+    const userId =
+      newState.id;
+
 
     // دخل روم صوتي
-    if (!oldState.channelId && newState.channelId) {
+    if (
+      !oldState.channelId &&
+      newState.channelId
+    ) {
 
       voiceJoinTimes.set(
         userId,
@@ -977,6 +1306,7 @@ client.on(
       return;
     }
 
+
     // خرج من روم صوتي
     if (
       oldState.channelId &&
@@ -984,55 +1314,108 @@ client.on(
     ) {
 
       const joinedAt =
-        voiceJoinTimes.get(userId);
+        voiceJoinTimes.get(
+          userId
+        );
 
-      if (joinedAt) {
 
-        const seconds =
-          Math.floor(
-            (Date.now() - joinedAt) / 1000
-          );
-
-        data.voice[userId] =
-          (data.voice[userId] || 0) +
-          seconds;
-
-        voiceJoinTimes.delete(userId);
-
-        saveData();
+      if (!joinedAt) {
+        return;
       }
+
+
+      const seconds =
+        Math.floor(
+          (
+            Date.now() -
+            joinedAt
+          ) / 1000
+        );
+
+
+      // حماية
+      if (
+        !data ||
+        typeof data !== 'object'
+      ) {
+
+        data = {
+          messages: {},
+          voice: {}
+        };
+
+      }
+
+
+      if (
+        !data.voice ||
+        typeof data.voice !== 'object'
+      ) {
+
+        data.voice = {};
+
+      }
+
+
+      data.voice[userId] =
+        Number(
+          data.voice[userId] || 0
+        ) + seconds;
+
+
+      voiceJoinTimes.delete(
+        userId
+      );
+
+
+      saveData();
+
     }
+
   }
 );
 
 
-// =========================
-// أمر /dna
-// =========================
+// ==================================================
+// /dna
+// ==================================================
 
 client.on(
   'interactionCreate',
   async interaction => {
 
-    if (!interaction.isChatInputCommand()) {
+    if (
+      !interaction.isChatInputCommand()
+    ) {
       return;
     }
 
-    if (interaction.commandName !== 'dna') {
+
+    if (
+      interaction.commandName !== 'dna'
+    ) {
       return;
     }
+
 
     try {
 
+      // القناة المسموح فيها بالأمر
       if (
         interaction.channelId !==
         DNA_CHANNEL_ID
       ) {
+
         return interaction.reply({
+
           content:
             '❌ لا يمكنك استخدام هذا الأمر في هذه القناة.',
-          flags: MessageFlags.Ephemeral
+
+          flags:
+            MessageFlags.Ephemeral
+
         });
+
       }
 
 
@@ -1047,42 +1430,59 @@ client.on(
 
 
       const imagePath =
-        await createDNAImage(member);
+        await createDNAImage(
+          member
+        );
 
 
       const attachment =
         new AttachmentBuilder(
           imagePath,
           {
-            name: 'NEON-DNA.png'
+            name:
+              'NEON-DNA.png'
           }
         );
 
 
       await interaction.editReply({
-        files: [attachment]
+        files: [
+          attachment
+        ]
       });
 
 
-      // حذف الملف بعد الإرسال
-      setTimeout(() => {
+      // حذف الصورة من السيرفر بعد الإرسال
+      setTimeout(
+        () => {
 
-        try {
+          try {
 
-          if (
-            fs.existsSync(imagePath)
-          ) {
-            fs.unlinkSync(imagePath);
+            if (
+              fs.existsSync(
+                imagePath
+              )
+            ) {
+
+              fs.unlinkSync(
+                imagePath
+              );
+
+            }
+
+          } catch (error) {
+
+            console.error(
+              '❌ خطأ في حذف الصورة:',
+              error
+            );
+
           }
 
-        } catch (error) {
-          console.error(
-            '❌ خطأ في حذف الصورة:',
-            error
-          );
-        }
+        },
+        5000
+      );
 
-      }, 5000);
 
     } catch (error) {
 
@@ -1091,32 +1491,45 @@ client.on(
         error
       );
 
+
       const reply = {
         content:
           '❌ حصل خطأ أثناء إنشاء بطاقة العضو.'
       };
 
-      if (interaction.deferred) {
 
-        await interaction.editReply(
-          reply
-        ).catch(() => {});
+      if (
+        interaction.deferred
+      ) {
 
-      } else if (!interaction.replied) {
+        await interaction
+          .editReply(reply)
+          .catch(() => {});
 
-        await interaction.reply({
-          ...reply,
-          flags: MessageFlags.Ephemeral
-        }).catch(() => {});
+
+      } else if (
+        !interaction.replied
+      ) {
+
+        await interaction
+          .reply({
+            ...reply,
+            flags:
+              MessageFlags.Ephemeral
+          })
+          .catch(() => {});
+
       }
+
     }
+
   }
 );
 
 
-// =========================
+// ==================================================
 // إيقاف البوت
-// =========================
+// ==================================================
 
 process.on(
   'SIGINT',
@@ -1126,11 +1539,13 @@ process.on(
       '🛑 جاري إيقاف البوت...'
     );
 
+
     saveData();
 
     client.destroy();
 
     process.exit(0);
+
   }
 );
 
@@ -1143,17 +1558,19 @@ process.on(
       '🛑 جاري إيقاف البوت...'
     );
 
+
     saveData();
 
     client.destroy();
 
     process.exit(0);
+
   }
 );
 
 
-// =========================
+// ==================================================
 // تسجيل الدخول
-// =========================
+// ==================================================
 
 client.login(TOKEN);
