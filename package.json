@@ -1,0 +1,12 @@
+{
+  "name": "neon-dna",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.21.0",
+    "sharp": "^0.34.3"
+  }
+}
