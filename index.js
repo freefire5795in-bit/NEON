@@ -67,7 +67,7 @@ function saveData() {
       'utf8'
     );
   } catch (error) {
-    console.error('❌ خطأ أثناء حفظ البيانات:', error);
+    console.error('❌ خطأ في حفظ البيانات:', error);
   }
 }
 
@@ -84,7 +84,20 @@ function getMemberData(guildId, userId) {
 }
 
 // ═══════════════════════════════════════
-// تحويل الأرقام للعربية
+// حماية النص
+// ═══════════════════════════════════════
+
+function escapeXML(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// ═══════════════════════════════════════
+// الأرقام العربية
 // ═══════════════════════════════════════
 
 function arabicNumbers(value) {
@@ -102,24 +115,12 @@ function arabicNumbers(value) {
 }
 
 // ═══════════════════════════════════════
-// حماية SVG
-// ═══════════════════════════════════════
-
-function escapeXML(text) {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-// ═══════════════════════════════════════
 // مدة العضوية
-// مثال: ١٦ يوم و ١٧ ساعة
+// مثال: 16 يوم و 17 ساعة
 // ═══════════════════════════════════════
 
 function getMembershipTime(joinedAt) {
+
   if (!joinedAt) {
     return 'غير معروف';
   }
@@ -130,7 +131,7 @@ function getMembershipTime(joinedAt) {
   );
 
   const totalHours = Math.floor(
-    elapsed / 3600000
+    elapsed / (60 * 60 * 1000)
   );
 
   const days = Math.floor(
@@ -147,6 +148,7 @@ function getMembershipTime(joinedAt) {
 // ═══════════════════════════════════════
 
 function getAccountAge(createdAt) {
+
   if (!createdAt) {
     return 'غير معروف';
   }
@@ -178,10 +180,11 @@ function getAccountAge(createdAt) {
 }
 
 // ═══════════════════════════════════════
-// وقت المكالمات
+// وقت الفويس
 // ═══════════════════════════════════════
 
 function formatVoiceTime(seconds) {
+
   seconds = Math.max(
     0,
     Math.floor(seconds)
@@ -219,6 +222,7 @@ function formatVoiceTime(seconds) {
 // ═══════════════════════════════════════
 
 function getMemberStatus(member) {
+
   const status = member.presence?.status;
 
   if (status === 'online') {
@@ -249,35 +253,35 @@ function getMemberStatus(member) {
 }
 
 // ═══════════════════════════════════════
-// رقم العضو
-// يعتمد على ترتيب دخول الأعضاء
+// رقم العضو داخل السيرفر
 // ═══════════════════════════════════════
 
 async function getMemberNumber(guild, target) {
+
   try {
+
     const members = await guild.members.fetch();
 
     const humans = [
       ...members.values()
     ]
       .filter(member => !member.user.bot)
-      .filter(member => member.joinedTimestamp)
       .sort(
         (a, b) =>
-          a.joinedTimestamp - b.joinedTimestamp
+          (a.joinedTimestamp || Infinity) -
+          (b.joinedTimestamp || Infinity)
       );
 
     const index = humans.findIndex(
       member => member.id === target.id
     );
 
-    if (index === -1) {
-      return humans.length + 1;
-    }
-
-    return index + 1;
+    return index < 0
+      ? humans.length
+      : index + 1;
 
   } catch (error) {
+
     console.error(
       '⚠️ تعذر حساب رقم العضو:',
       error.message
@@ -292,6 +296,7 @@ async function getMemberNumber(guild, target) {
 // ═══════════════════════════════════════
 
 function formatDate(date) {
+
   if (!date) {
     return 'غير معروف';
   }
@@ -306,26 +311,22 @@ function formatDate(date) {
 
   const year = date.getFullYear();
 
-  return arabicNumbers(
-    `${day}/${month}/${year}`
-  );
+  return `${arabicNumbers(day)}/${arabicNumbers(month)}/${arabicNumbers(year)}`;
 }
 
 // ═══════════════════════════════════════
 // تقصير النص
 // ═══════════════════════════════════════
 
-function fitText(text, max = 22) {
+function fitText(text, max = 25) {
+
   text = String(text);
 
   if (text.length <= max) {
     return text;
   }
 
-  return (
-    text.substring(0, max - 3) +
-    '...'
-  );
+  return text.substring(0, max - 3) + '...';
 }
 
 // ═══════════════════════════════════════
@@ -338,25 +339,19 @@ async function createDNAImage(
   memberNumber
 ) {
 
-  // حجم البطاقة الجديد
+  // مساحة أكبر حتى لا تتداخل الخانات
   const width = 1400;
-  const height = 1500;
+  const height = 1600;
 
-  // ═════════════════════════════════════
-  // بيانات العضو
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
+  // البيانات
+  // ═══════════════════════════════
 
   const username = escapeXML(
     member.user.username
   );
 
-  const tag = escapeXML(
-    member.user.tag ||
-    member.user.username
-  );
-
-  const nickname = escapeXML(
-    member.nickname ||
+  const globalName = escapeXML(
     member.user.globalName ||
     member.user.username
   );
@@ -379,28 +374,21 @@ async function createDNAImage(
     member.user.createdAt
   );
 
-  // عدد الرتب بدون @everyone
   const roles = Math.max(
     0,
     member.roles.cache.size - 1
   );
 
-  const messagesNumber =
-    Number(memberData.messages || 0);
+  const messages = Number(
+    memberData.messages || 0
+  ).toLocaleString('en-US');
 
-  const messages =
-    arabicNumbers(
-      messagesNumber.toLocaleString('en-US')
-    );
-
-  // ═════════════════════════════════════
-  // وقت الفويس
-  // ═════════════════════════════════════
-
-  let voiceSeconds =
-    Number(memberData.voiceSeconds || 0);
+  let voiceSeconds = Number(
+    memberData.voiceSeconds || 0
+  );
 
   if (memberData.voiceStarted) {
+
     voiceSeconds += Math.max(
       0,
       Math.floor(
@@ -416,9 +404,9 @@ async function createDNAImage(
     voiceSeconds
   );
 
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
   // صورة العضو
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
 
   let avatar = '';
 
@@ -427,7 +415,7 @@ async function createDNAImage(
     const avatarURL =
       member.user.displayAvatarURL({
         extension: 'png',
-        size: 256
+        size: 512
       });
 
     const response =
@@ -450,42 +438,40 @@ async function createDNAImage(
   }
 
   const avatarSVG = avatar
-
     ? `
       <image
         href="data:image/png;base64,${avatar}"
         x="92"
-        y="190"
+        y="175"
         width="310"
         height="310"
         preserveAspectRatio="xMidYMid slice"
         clip-path="url(#avatarClip)"
       />
     `
-
     : `
       <circle
         cx="247"
-        cy="345"
+        cy="330"
         r="155"
         fill="#160303"
       />
 
       <text
         x="247"
-        y="365"
+        y="350"
         text-anchor="middle"
         fill="#ff2028"
-        font-size="65"
+        font-size="55"
         font-weight="bold"
       >
         NEON
       </text>
     `;
 
-  // ═════════════════════════════════════
-  // الخانات الرئيسية
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
+  // الخانة الكبيرة
+  // ═══════════════════════════════
 
   function statBox(
     x,
@@ -526,15 +512,15 @@ async function createDNAImage(
         font-weight="bold"
         direction="rtl"
       >
-        ${icon} ${title}
+        ${title} ${icon}
       </text>
 
       <text
         x="${x + w / 2}"
-        y="${y + 80}"
+        y="${y + 82}"
         text-anchor="middle"
         fill="#8f8f8f"
-        font-size="15"
+        font-size="16"
         direction="rtl"
       >
         ${subtitle}
@@ -554,25 +540,24 @@ async function createDNAImage(
 
       <path
         d="
-          M${x + w / 2 - 38} ${y + h - 22}
-          H${x + w / 2 + 38}
+          M${x + w / 2 - 35} ${y + h - 22}
+          H${x + w / 2 + 35}
         "
         stroke="#ff202d"
-        stroke-width="5"
+        stroke-width="4"
         stroke-linecap="round"
       />
     `;
   }
 
-  // ═════════════════════════════════════
-  // الخانات الصغيرة
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
+  // الخانة الصغيرة
+  // ═══════════════════════════════
 
   function smallBox(
     x,
     y,
     w,
-    h,
     title,
     value,
     icon,
@@ -585,10 +570,10 @@ async function createDNAImage(
           M${x + 16} ${y}
           H${x + w - 16}
           L${x + w} ${y + 16}
-          V${y + h - 16}
-          L${x + w - 16} ${y + h}
+          V${y + 155}
+          L${x + w - 16} ${y + 171}
           H${x + 16}
-          L${x} ${y + h - 16}
+          L${x} ${y + 155}
           V${y + 16}
           Z
         "
@@ -606,7 +591,7 @@ async function createDNAImage(
         font-weight="bold"
         direction="rtl"
       >
-        ${icon} ${title}
+        ${title} ${icon}
       </text>
 
       <text
@@ -623,8 +608,8 @@ async function createDNAImage(
 
       <path
         d="
-          M${x + w / 2 - 24} ${y + h - 30}
-          H${x + w / 2 + 24}
+          M${x + w / 2 - 22} ${y + 140}
+          H${x + w / 2 + 22}
         "
         stroke="#ff202d"
         stroke-width="4"
@@ -633,9 +618,9 @@ async function createDNAImage(
     `;
   }
 
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
   // SVG
-  // ═════════════════════════════════════
+  // ═══════════════════════════════
 
   const svg = `
 
@@ -648,8 +633,6 @@ async function createDNAImage(
 
     <defs>
 
-      <!-- الخلفية -->
-
       <linearGradient
         id="background"
         x1="0"
@@ -657,7 +640,6 @@ async function createDNAImage(
         x2="1"
         y2="1"
       >
-
         <stop
           offset="0%"
           stop-color="#020202"
@@ -672,10 +654,7 @@ async function createDNAImage(
           offset="100%"
           stop-color="#020202"
         />
-
       </linearGradient>
-
-      <!-- الخط الأحمر -->
 
       <linearGradient
         id="redLine"
@@ -684,7 +663,6 @@ async function createDNAImage(
         x2="1"
         y2="0"
       >
-
         <stop
           offset="0%"
           stop-color="#3b0004"
@@ -699,10 +677,7 @@ async function createDNAImage(
           offset="100%"
           stop-color="#3b0004"
         />
-
       </linearGradient>
-
-      <!-- توهج -->
 
       <filter id="glow">
 
@@ -712,22 +687,17 @@ async function createDNAImage(
         />
 
         <feMerge>
-
           <feMergeNode in="blur"/>
-
           <feMergeNode in="SourceGraphic"/>
-
         </feMerge>
 
       </filter>
-
-      <!-- دائرة الصورة -->
 
       <clipPath id="avatarClip">
 
         <circle
           cx="247"
-          cy="345"
+          cy="330"
           r="155"
         />
 
@@ -735,9 +705,7 @@ async function createDNAImage(
 
     </defs>
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الخلفية -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الخلفية ═════════ -->
 
     <rect
       width="${width}"
@@ -756,15 +724,13 @@ async function createDNAImage(
 
     <circle
       cx="100"
-      cy="1370"
+      cy="1450"
       r="250"
       fill="#ff0000"
       opacity=".04"
     />
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الإطار الخارجي -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الإطار ═════════ -->
 
     <path
       d="
@@ -772,10 +738,10 @@ async function createDNAImage(
         L88 118
         H1312
         L1372 145
-        V1370
-        L1312 1400
+        V1480
+        L1312 1510
         H88
-        L28 1370
+        L28 1480
         Z
       "
       fill="none"
@@ -788,15 +754,13 @@ async function createDNAImage(
       x="48"
       y="160"
       width="1304"
-      height="1210"
+      height="1320"
       fill="none"
       stroke="#62070c"
       stroke-width="2"
     />
 
-    <!-- ═════════════════════════════════ -->
-    <!-- العنوان -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ العنوان ═════════ -->
 
     <text
       x="78"
@@ -847,13 +811,11 @@ async function createDNAImage(
       filter="url(#glow)"
     />
 
-    <!-- ═════════════════════════════════ -->
-    <!-- صورة العضو -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الأفاتار ═════════ -->
 
     <circle
       cx="247"
-      cy="345"
+      cy="330"
       r="178"
       fill="#050505"
       stroke="#4c0005"
@@ -862,7 +824,7 @@ async function createDNAImage(
 
     <circle
       cx="247"
-      cy="345"
+      cy="330"
       r="165"
       fill="none"
       stroke="#ff151c"
@@ -872,7 +834,7 @@ async function createDNAImage(
 
     <circle
       cx="247"
-      cy="345"
+      cy="330"
       r="157"
       fill="none"
       stroke="#8c0a10"
@@ -881,32 +843,30 @@ async function createDNAImage(
 
     ${avatarSVG}
 
-    <!-- حالة العضو على الصورة -->
+    <!-- ═════════ حالة العضو بجانب الأفاتار ═════════ -->
 
     <circle
-      cx="367"
-      cy="465"
-      r="27"
+      cx="365"
+      cy="448"
+      r="26"
       fill="#050505"
       stroke="#ff2025"
       stroke-width="4"
     />
 
     <circle
-      cx="367"
-      cy="465"
-      r="16"
+      cx="365"
+      cy="448"
+      r="15"
       fill="${status.color}"
       filter="url(#glow)"
     />
 
-    <!-- ═════════════════════════════════ -->
-    <!-- معلومات العضو -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ اسم المستخدم ═════════ -->
 
     <text
       x="455"
-      y="265"
+      y="255"
       fill="#ffffff"
       font-size="40"
       font-weight="bold"
@@ -916,20 +876,20 @@ async function createDNAImage(
 
     <text
       x="455"
-      y="300"
+      y="292"
       fill="#999"
       font-size="20"
     >
-      @${tag}
+      @${username}
     </text>
 
-    <!-- رقم العضو -->
+    <!-- ═════════ رقم العضو ═════════ -->
 
     <path
       d="
-        M455 325
+        M455 320
         H810
-        L830 345
+        L830 340
         H455
         Z
       "
@@ -939,34 +899,35 @@ async function createDNAImage(
     />
 
     <text
-      x="480"
-      y="357"
+      x="590"
+      y="347"
+      text-anchor="middle"
       fill="#ff252d"
       font-size="19"
       font-weight="bold"
       direction="rtl"
     >
-      ♛ رقم العضو
+      رقم العضو
     </text>
 
     <text
-      x="790"
-      y="357"
+      x="785"
+      y="347"
+      text-anchor="end"
       fill="#ffffff"
       font-size="27"
       font-weight="bold"
-      text-anchor="end"
     >
       #${arabicNumbers(memberNumber)}
     </text>
 
-    <!-- حالة العضو -->
+    <!-- ═════════ الحالة ═════════ -->
 
     <path
       d="
-        M455 375
+        M455 365
         H810
-        L830 395
+        L830 385
         H455
         Z
       "
@@ -976,16 +937,16 @@ async function createDNAImage(
     />
 
     <circle
-      cx="482"
-      cy="410"
+      cx="485"
+      cy="400"
       r="8"
       fill="${status.color}"
       filter="url(#glow)"
     />
 
     <text
-      x="505"
-      y="417"
+      x="520"
+      y="407"
       fill="#999"
       font-size="18"
       direction="rtl"
@@ -994,8 +955,8 @@ async function createDNAImage(
     </text>
 
     <text
-      x="625"
-      y="417"
+      x="700"
+      y="407"
       fill="${status.color}"
       font-size="21"
       font-weight="bold"
@@ -1004,9 +965,7 @@ async function createDNAImage(
       ${status.text}
     </text>
 
-    <!-- ═════════════════════════════════ -->
-    <!-- ملف العضو -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ ملف العضو ═════════ -->
 
     <path
       d="
@@ -1065,13 +1024,12 @@ async function createDNAImage(
       بطاقة بيانات وإحصائيات العضو
     </text>
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الإحصائيات الرئيسية -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الإحصائيات الرئيسية ═════════ -->
+    <!-- تبدأ بعد الأفاتار بالكامل -->
 
     ${statBox(
       55,
-      465,
+      535,
       405,
       205,
       'مدة العضوية',
@@ -1083,96 +1041,82 @@ async function createDNAImage(
 
     ${statBox(
       497,
-      465,
+      535,
       405,
       205,
       'عدد الرسائل',
       'إجمالي رسائل العضو',
-      `${messages} رسالة`,
+      `${arabicNumbers(messages)} رسالة`,
       '✉',
       27
     )}
 
     ${statBox(
       939,
-      465,
+      535,
       405,
       205,
       'وقت المكالمات',
       'إجمالي وقت وجود العضو في الفويس',
       voice,
       '♫',
-      24
+      25
     )}
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الصف الأول -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الصف الأول ═════════ -->
 
     ${smallBox(
       55,
-      705,
+      775,
       305,
-      171,
       'حالة العضو',
       status.text,
-      '♥',
-      22
+      '♥'
     )}
 
     ${smallBox(
       380,
-      705,
+      775,
       305,
-      171,
       'ترتيب العضو',
       `#${arabicNumbers(memberNumber)}`,
-      '♙',
-      22
+      '♙'
     )}
 
     ${smallBox(
       705,
-      705,
+      775,
       305,
-      171,
       'عدد الرتب',
       `${arabicNumbers(roles)} رتبة`,
-      '◇',
-      22
+      '◇'
     )}
 
     ${smallBox(
       1030,
-      705,
+      775,
       314,
-      171,
       'عمر الحساب',
       accountAge,
-      '◉',
-      21
+      '◉'
     )}
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الصف الثاني -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الصف الثاني ═════════ -->
 
     ${smallBox(
       55,
-      905,
+      970,
       405,
-      171,
       'اسم العضو',
-      fitText(nickname, 22),
+      fitText(globalName, 22),
       '♟',
       20
     )}
 
     ${smallBox(
       497,
-      905,
+      970,
       405,
-      171,
       'تاريخ الانضمام',
       joinDate,
       '◇',
@@ -1181,47 +1125,62 @@ async function createDNAImage(
 
     ${smallBox(
       939,
-      905,
+      970,
       405,
-      171,
       'تاريخ إنشاء الحساب',
       accountDate,
       '◷',
       21
     )}
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الصف الثالث -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ الصف الثالث ═════════ -->
 
     ${smallBox(
       55,
-      1105,
+      1165,
       630,
-      171,
       'معرّف العضو',
       member.user.id,
       '#',
+      19
+    )}
+
+    ${smallBox(
+      705,
+      1165,
+      639,
+      'اسم المستخدم',
+      fitText(username, 25),
+      '♛',
+      20
+    )}
+
+    <!-- ═════════ معلومات إضافية ═════════ -->
+
+    ${smallBox(
+      55,
+      1360,
+      630,
+      'الاسم الظاهر',
+      fitText(globalName, 25),
+      '✦',
       20
     )}
 
     ${smallBox(
       705,
-      1105,
+      1360,
       639,
-      171,
-      'اسم المستخدم',
-      fitText(member.user.username, 25),
+      'رقم العضوية',
+      `#${arabicNumbers(memberNumber)}`,
       '♛',
-      20
+      21
     )}
 
-    <!-- ═════════════════════════════════ -->
-    <!-- الخط السفلي -->
-    <!-- ═════════════════════════════════ -->
+    <!-- ═════════ النهاية ═════════ -->
 
     <path
-      d="M55 1310H1345"
+      d="M55 1550H1345"
       stroke="url(#redLine)"
       stroke-width="4"
       filter="url(#glow)"
@@ -1229,24 +1188,13 @@ async function createDNAImage(
 
     <text
       x="700"
-      y="1350"
+      y="1580"
       text-anchor="middle"
       fill="#ff2525"
-      font-size="38"
+      font-size="35"
       font-weight="bold"
     >
       ♛ NEON
-    </text>
-
-    <text
-      x="700"
-      y="1380"
-      text-anchor="middle"
-      fill="#777"
-      font-size="15"
-      direction="rtl"
-    >
-      بطاقة العضو • الإحصائيات • البيانات
     </text>
 
   </svg>
@@ -1329,46 +1277,6 @@ client.once(
       `📌 قناة بطاقات الأعضاء: ${DNA_CHANNEL_ID}`
     );
 
-    // استعادة وقت الفويس للأعضاء الموجودين حاليًا
-    for (const guild of client.guilds.cache.values()) {
-
-      try {
-
-        const members =
-          await guild.members.fetch();
-
-        for (const member of members.values()) {
-
-          if (
-            member.user.bot ||
-            !member.voice?.channel
-          ) {
-            continue;
-          }
-
-          const memberData =
-            getMemberData(
-              guild.id,
-              member.id
-            );
-
-          if (!memberData.voiceStarted) {
-            memberData.voiceStarted =
-              Date.now();
-          }
-        }
-
-      } catch (error) {
-
-        console.error(
-          '⚠️ خطأ في استعادة الفويس:',
-          error.message
-        );
-      }
-    }
-
-    saveData();
-
     await registerCommands();
   }
 );
@@ -1440,9 +1348,7 @@ client.on(
       !newState.channel
     ) {
 
-      if (
-        memberData.voiceStarted
-      ) {
+      if (memberData.voiceStarted) {
 
         memberData.voiceSeconds +=
           Math.max(
@@ -1463,7 +1369,7 @@ client.on(
       return;
     }
 
-    // الانتقال بين رومات الفويس
+    // الانتقال بين الرومات
 
     if (
       oldState.channel &&
@@ -1472,9 +1378,7 @@ client.on(
       newState.channel.id
     ) {
 
-      if (
-        !memberData.voiceStarted
-      ) {
+      if (!memberData.voiceStarted) {
 
         memberData.voiceStarted =
           Date.now();
@@ -1506,7 +1410,7 @@ client.on(
       return;
     }
 
-    // لازم الأمر يكون في قناة DNA
+    // الأمر يعمل داخل قناة DNA فقط
 
     if (
       interaction.channelId !==
@@ -1582,7 +1486,7 @@ client.on(
 );
 
 // ═══════════════════════════════════════
-// حفظ البيانات عند إيقاف البوت
+// حفظ البيانات عند الإغلاق
 // ═══════════════════════════════════════
 
 process.on(
