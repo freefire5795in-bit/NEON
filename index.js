@@ -12,15 +12,16 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-// =========================
-// إعدادات البوت
-// =========================
+// ======================================================
+// SETTINGS
+// ======================================================
+
 const CLIENT_ID = '1557370938650271824';
 const DNA_CHANNEL_ID = '1557391771527553125';
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
-  console.error('❌ DISCORD_TOKEN غير موجود في Environment Variables.');
+  console.error('❌ DISCORD_TOKEN غير موجود.');
   process.exit(1);
 }
 
@@ -35,51 +36,25 @@ const client = new Client({
   ]
 });
 
-// =========================
-// حفظ البيانات
-// =========================
+// ======================================================
+// DATA
+// ======================================================
+
 const DATA_FILE = path.join(__dirname, 'data.json');
+
 let data = {};
 
 if (fs.existsSync(DATA_FILE)) {
   try {
-    data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    data = JSON.parse(
+      fs.readFileSync(DATA_FILE, 'utf8')
+    );
   } catch {
     data = {};
   }
 }
 
 let saveTimer = null;
-
-function saveDataSoon() {
-  if (saveTimer) return;
-
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-
-    try {
-      fs.writeFileSync(
-        DATA_FILE,
-        JSON.stringify(data, null, 2),
-        'utf8'
-      );
-    } catch (error) {
-      console.error('❌ خطأ أثناء حفظ البيانات:', error);
-    }
-  }, 3000);
-}
-
-function saveDataNow() {
-  try {
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(data, null, 2),
-      'utf8'
-    );
-  } catch (error) {
-    console.error('❌ خطأ أثناء حفظ البيانات:', error);
-  }
-}
 
 function getMemberData(guildId, userId) {
   if (!data[guildId]) {
@@ -97,9 +72,46 @@ function getMemberData(guildId, userId) {
   return data[guildId][userId];
 }
 
-// =========================
-// أدوات النص
-// =========================
+function saveSoon() {
+  if (saveTimer) return;
+
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+
+    try {
+      fs.writeFileSync(
+        DATA_FILE,
+        JSON.stringify(data, null, 2),
+        'utf8'
+      );
+    } catch (error) {
+      console.error(
+        '❌ خطأ في حفظ البيانات:',
+        error
+      );
+    }
+  }, 3000);
+}
+
+function saveNow() {
+  try {
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(data, null, 2),
+      'utf8'
+    );
+  } catch (error) {
+    console.error(
+      '❌ خطأ في حفظ البيانات:',
+      error
+    );
+  }
+}
+
+// ======================================================
+// TEXT
+// ======================================================
+
 function escapeXML(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -109,38 +121,51 @@ function escapeXML(value) {
     .replace(/'/g, '&apos;');
 }
 
-function number(value) {
+function formatNumber(value) {
   return Number(value || 0).toLocaleString('en-US');
 }
 
-function fitText(value, max = 24) {
-  const text = String(value ?? '');
+function fitText(text, max) {
+  text = String(text || '');
 
   if (text.length <= max) {
     return text;
   }
 
-  return `${text.slice(0, max - 3)}...`;
+  return text.substring(0, max - 3) + '...';
 }
 
-// =========================
-// التاريخ
-// =========================
+// ======================================================
+// DATE
+// ======================================================
+
 function formatDate(date) {
   if (!date || Number.isNaN(date.getTime())) {
     return 'غير معروف';
   }
 
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(
+    date.getDate()
+  ).padStart(2, '0');
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, '0');
+
   const year = date.getFullYear();
 
   return `${day}/${month}/${year}`;
 }
 
-// =========================
-// عمر الحساب الحقيقي
-// =========================
+// ======================================================
+// ACCOUNT AGE
+// مثال:
+// 28/05/2026 -> 07/10/2026
+// = 4 شهور
+//
+// هنا لا نعرض الأيام المتبقية.
+// ======================================================
+
 function getAccountAge(createdAt) {
   if (!createdAt) {
     return 'غير معروف';
@@ -148,84 +173,71 @@ function getAccountAge(createdAt) {
 
   const now = new Date();
 
-  let years =
-    now.getFullYear() -
-    createdAt.getFullYear();
-
   let months =
-    now.getMonth() -
-    createdAt.getMonth();
+    (now.getFullYear() - createdAt.getFullYear()) * 12 +
+    (now.getMonth() - createdAt.getMonth());
 
-  let days =
-    now.getDate() -
-    createdAt.getDate();
-
-  if (days < 0) {
+  if (
+    now.getDate() < createdAt.getDate()
+  ) {
     months--;
-
-    const previousMonthDays = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      0
-    ).getDate();
-
-    days += previousMonthDays;
   }
 
-  if (months < 0) {
-    years--;
-    months += 12;
-  }
+  months = Math.max(0, months);
 
-  if (years > 0) {
-    if (months > 0) {
-      return `${years} سنة و ${months} شهر`;
+  if (months >= 12) {
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+
+    if (remainingMonths > 0) {
+      return `${years} سنة و ${remainingMonths} شهر`;
     }
 
     return `${years} سنة`;
   }
 
   if (months > 0) {
-    if (days > 0) {
-      return `${months} شهر و ${days} يوم`;
-    }
-
-    return `${months} شهر`;
+    return `${months} شهور`;
   }
 
-  if (days > 0) {
-    return `${days} يوم`;
-  }
-
-  return 'اليوم';
+  return 'أقل من شهر';
 }
 
-// =========================
-// مدة العضوية
-// =========================
+// ======================================================
+// MEMBERSHIP
+// ======================================================
+
 function getMembershipTime(joinedAt) {
   if (!joinedAt) {
     return 'غير معروف';
   }
 
-  const elapsed =
-    Math.max(0, Date.now() - joinedAt.getTime());
+  const difference =
+    Math.max(
+      0,
+      Date.now() - joinedAt.getTime()
+    );
 
   const totalHours =
-    Math.floor(elapsed / 3600000);
+    Math.floor(
+      difference / 3600000
+    );
 
   const days =
-    Math.floor(totalHours / 24);
+    Math.floor(
+      totalHours / 24
+    );
 
   const hours =
     totalHours % 24;
 
-  return `${number(days)} يوم و ${number(hours)} ساعة`;
+  return `${formatNumber(days)} يوم و ${formatNumber(hours)} ساعة`;
 }
 
-// =========================
-// وقت الفويس
-// =========================
+// ======================================================
+// VOICE TIME
+// ======================================================
+
 function formatVoiceTime(seconds) {
   seconds = Math.max(
     0,
@@ -246,26 +258,28 @@ function formatVoiceTime(seconds) {
     Math.floor(seconds / 60);
 
   if (days > 0) {
-    return `${number(days)} يوم و ${number(hours)} ساعة`;
+    return `${formatNumber(days)} يوم و ${formatNumber(hours)} ساعة`;
   }
 
   if (hours > 0) {
-    return `${number(hours)} ساعة و ${number(minutes)} دقيقة`;
+    return `${formatNumber(hours)} ساعة و ${formatNumber(minutes)} دقيقة`;
   }
 
-  return `${number(minutes)} دقيقة`;
+  return `${formatNumber(minutes)} دقيقة`;
 }
 
-// =========================
-// حالة العضو
-// =========================
-function getMemberStatus(member) {
-  const status = member.presence?.status;
+// ======================================================
+// STATUS
+// ======================================================
+
+function getStatus(member) {
+  const status =
+    member.presence?.status;
 
   if (status === 'online') {
     return {
       text: 'متصل',
-      color: '#35e06f'
+      color: '#32e875'
     };
   }
 
@@ -289,41 +303,42 @@ function getMemberStatus(member) {
   };
 }
 
-// =========================
-// رقم العضو
-// =========================
-async function getMemberNumber(guild, target) {
+// ======================================================
+// MEMBER NUMBER
+// ======================================================
+
+async function getMemberNumber(
+  guild,
+  target
+) {
   try {
     const members =
       await guild.members.fetch();
 
     const humans =
       [...members.values()]
-        .filter(member => !member.user.bot)
-        .sort((a, b) => {
-          const aTime =
-            a.joinedTimestamp ||
-            Number.MAX_SAFE_INTEGER;
-
-          const bTime =
-            b.joinedTimestamp ||
-            Number.MAX_SAFE_INTEGER;
-
-          return aTime - bTime;
-        });
+        .filter(
+          member => !member.user.bot
+        )
+        .sort(
+          (a, b) =>
+            (a.joinedTimestamp || Infinity) -
+            (b.joinedTimestamp || Infinity)
+        );
 
     const index =
       humans.findIndex(
-        member => member.id === target.id
+        member =>
+          member.id === target.id
       );
 
-    return index >= 0
-      ? index + 1
-      : humans.length;
+    return index === -1
+      ? 1
+      : index + 1;
 
   } catch (error) {
     console.error(
-      '⚠️ تعذر حساب رقم العضو:',
+      '❌ خطأ في حساب رقم العضو:',
       error
     );
 
@@ -331,10 +346,11 @@ async function getMemberNumber(guild, target) {
   }
 }
 
-// =========================
-// تحميل الأفاتار
-// =========================
-async function getAvatarData(member) {
+// ======================================================
+// AVATAR
+// ======================================================
+
+async function getAvatar(member) {
   try {
     const url =
       member.user.displayAvatarURL({
@@ -348,7 +364,7 @@ async function getAvatarData(member) {
 
     if (!response.ok) {
       throw new Error(
-        `Avatar HTTP ${response.status}`
+        `HTTP ${response.status}`
       );
     }
 
@@ -357,20 +373,22 @@ async function getAvatarData(member) {
         await response.arrayBuffer()
       );
 
-    const png =
+    const image =
       await sharp(buffer)
         .resize(512, 512, {
-          fit: 'cover',
-          position: 'centre'
+          fit: 'cover'
         })
         .png()
         .toBuffer();
 
-    return `data:image/png;base64,${png.toString('base64')}`;
+    return (
+      'data:image/png;base64,' +
+      image.toString('base64')
+    );
 
   } catch (error) {
     console.error(
-      '⚠️ تعذر تحميل الأفاتار:',
+      '⚠️ مشكلة في الأفاتار:',
       error
     );
 
@@ -378,42 +396,42 @@ async function getAvatarData(member) {
   }
 }
 
-// =========================
-// إنشاء بطاقة NEON
-// =========================
+// ======================================================
+// MAIN CARD
+// ======================================================
+
 async function createDNAImage(
   member,
   memberData,
   memberNumber
 ) {
-  const width = 1400;
-  const height = 1400;
+  const WIDTH = 1400;
+  const HEIGHT = 1400;
 
-  const avatarData =
-    await getAvatarData(member);
+  const avatar =
+    await getAvatar(member);
 
-  const displayName =
+  const status =
+    getStatus(member);
+
+  const name =
     fitText(
       member.displayName ||
       member.user.globalName ||
       member.user.username,
-      24
+      20
     );
 
   const username =
     fitText(
       member.user.username,
-      28
+      27
     );
 
-  const memberId =
-    member.user.id;
-
-  const status =
-    getMemberStatus(member);
-
   const membership =
-    getMembershipTime(member.joinedAt);
+    getMembershipTime(
+      member.joinedAt
+    );
 
   const accountAge =
     getAccountAge(
@@ -421,21 +439,25 @@ async function createDNAImage(
     );
 
   const joinDate =
-    formatDate(member.joinedAt);
+    formatDate(
+      member.joinedAt
+    );
 
   const accountDate =
     formatDate(
       member.user.createdAt
     );
 
-  const roleCount =
+  const roles =
     Math.max(
       0,
       member.roles.cache.size - 1
     );
 
   const messages =
-    number(memberData.messages);
+    Number(
+      memberData.messages || 0
+    );
 
   let voiceSeconds =
     Number(
@@ -443,14 +465,15 @@ async function createDNAImage(
     );
 
   if (memberData.voiceStarted) {
-    voiceSeconds += Math.max(
-      0,
+    voiceSeconds +=
       Math.floor(
-        (Date.now() -
-          Number(memberData.voiceStarted)) /
-          1000
-      )
-    );
+        (
+          Date.now() -
+          Number(
+            memberData.voiceStarted
+          )
+        ) / 1000
+      );
   }
 
   const voice =
@@ -459,224 +482,227 @@ async function createDNAImage(
     );
 
   const safeName =
-    escapeXML(displayName);
+    escapeXML(name);
 
   const safeUsername =
     escapeXML(username);
 
-  const safeMemberId =
-    escapeXML(memberId);
+  const safeID =
+    escapeXML(member.user.id);
 
-  const avatarCircle =
-    avatarData
-      ? `
-        <defs>
-          <clipPath id="avatarClip">
-            <circle
-              cx="205"
-              cy="285"
-              r="145"
-            />
-          </clipPath>
-        </defs>
+  // ====================================================
+  // BOX
+  // ====================================================
 
-        <image
-          href="${avatarData}"
-          x="60"
-          y="140"
-          width="290"
-          height="290"
-          preserveAspectRatio="xMidYMid slice"
-          clip-path="url(#avatarClip)"
-        />
-      `
-      : `
-        <circle
-          cx="205"
-          cy="285"
-          r="145"
-          fill="#111"
+  function bigBox(
+    x,
+    y,
+    width,
+    title,
+    subtitle,
+    value
+  ) {
+    return `
+      <g>
+
+        <path
+          d="
+            M ${x + 25} ${y}
+            H ${x + width - 25}
+            L ${x + width} ${y + 25}
+            V ${y + 165}
+            L ${x + width - 25} ${y + 190}
+            H ${x + 25}
+            L ${x} ${y + 165}
+            V ${y + 25}
+            Z
+          "
+          fill="#050505"
+          stroke="#e51a2a"
+          stroke-width="2"
         />
 
         <text
-          x="205"
-          y="305"
+          x="${x + width / 2}"
+          y="${y + 42}"
           text-anchor="middle"
-          font-size="48"
-          fill="#777"
+          direction="rtl"
           font-family="Arial, Tahoma, sans-serif"
+          font-size="21"
+          font-weight="bold"
+          fill="#ff2635"
         >
-          NEON
+          ${escapeXML(title)}
         </text>
-      `;
 
-  // =========================
-  // الصناديق
-  // =========================
-  const box = (
+        <text
+          x="${x + width / 2}"
+          y="${y + 73}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="14"
+          fill="#777"
+        >
+          ${escapeXML(subtitle)}
+        </text>
+
+        <text
+          x="${x + width / 2}"
+          y="${y + 135}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="${String(value).length > 25 ? 19 : 25}"
+          font-weight="bold"
+          fill="#f5f5f5"
+        >
+          ${escapeXML(value)}
+        </text>
+
+        <rect
+          x="${x + width / 2 - 34}"
+          y="${y + 166}"
+          width="68"
+          height="4"
+          rx="2"
+          fill="#ff2635"
+        />
+
+      </g>
+    `;
+  }
+
+  function smallBox(
     x,
     y,
-    w,
-    h,
-    title,
-    value,
-    subtitle = ''
-  ) => `
-    <g>
-
-      <path
-        d="
-          M ${x + 24} ${y}
-          H ${x + w - 24}
-          L ${x + w} ${y + 24}
-          V ${y + h - 24}
-          L ${x + w - 24} ${y + h}
-          H ${x + 24}
-          L ${x} ${y + h - 24}
-          V ${y + 24}
-          Z
-        "
-        fill="#050505"
-        stroke="#ff1f2d"
-        stroke-width="2"
-      />
-
-      <text
-        x="${x + w / 2}"
-        y="${y + 42}"
-        text-anchor="middle"
-        direction="rtl"
-        font-family="Arial, Tahoma, sans-serif"
-        font-size="22"
-        font-weight="700"
-        fill="#ff3340"
-      >
-        ${escapeXML(title)}
-      </text>
-
-      ${
-        subtitle
-          ? `
-            <text
-              x="${x + w / 2}"
-              y="${y + 76}"
-              text-anchor="middle"
-              direction="rtl"
-              font-family="Arial, Tahoma, sans-serif"
-              font-size="14"
-              fill="#8f8f8f"
-            >
-              ${escapeXML(subtitle)}
-            </text>
-          `
-          : ''
-      }
-
-      <text
-        x="${x + w / 2}"
-        y="${y + h - 54}"
-        text-anchor="middle"
-        direction="rtl"
-        font-family="Arial, Tahoma, sans-serif"
-        font-size="${String(value).length > 24 ? 19 : 25}"
-        font-weight="700"
-        fill="#f5f5f5"
-      >
-        ${escapeXML(value)}
-      </text>
-
-      <rect
-        x="${x + w / 2 - 34}"
-        y="${y + h - 20}"
-        width="68"
-        height="4"
-        rx="2"
-        fill="#ff2635"
-      />
-
-    </g>
-  `;
-
-  const smallBox = (
-    x,
-    y,
-    w,
-    h,
+    width,
     title,
     value
-  ) => `
-    <g>
+  ) {
+    return `
+      <g>
 
-      <path
-        d="
-          M ${x + 18} ${y}
-          H ${x + w - 18}
-          L ${x + w} ${y + 18}
-          V ${y + h - 18}
-          L ${x + w - 18} ${y + h}
-          H ${x + 18}
-          L ${x} ${y + h - 18}
-          V ${y + 18}
-          Z
-        "
-        fill="#050505"
-        stroke="#d7192a"
-        stroke-width="1.8"
+        <path
+          d="
+            M ${x + 18} ${y}
+            H ${x + width - 18}
+            L ${x + width} ${y + 18}
+            V ${y + 132}
+            L ${x + width - 18} ${y + 150}
+            H ${x + 18}
+            L ${x} ${y + 132}
+            V ${y + 18}
+            Z
+          "
+          fill="#050505"
+          stroke="#b91423"
+          stroke-width="1.8"
+        />
+
+        <text
+          x="${x + width / 2}"
+          y="${y + 38}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="18"
+          font-weight="bold"
+          fill="#ff2635"
+        >
+          ${escapeXML(title)}
+        </text>
+
+        <text
+          x="${x + width / 2}"
+          y="${y + 88}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="${String(value).length > 20 ? 16 : 22}"
+          font-weight="bold"
+          fill="#f2f2f2"
+        >
+          ${escapeXML(value)}
+        </text>
+
+        <rect
+          x="${x + width / 2 - 28}"
+          y="${y + 132}"
+          width="56"
+          height="4"
+          rx="2"
+          fill="#ff2635"
+        />
+
+      </g>
+    `;
+  }
+
+  // ====================================================
+  // AVATAR SVG
+  // ====================================================
+
+  const avatarSVG = avatar
+    ? `
+      <defs>
+
+        <clipPath id="avatarClip">
+          <circle
+            cx="205"
+            cy="285"
+            r="137"
+          />
+        </clipPath>
+
+      </defs>
+
+      <image
+        href="${avatar}"
+        x="68"
+        y="148"
+        width="274"
+        height="274"
+        preserveAspectRatio="xMidYMid slice"
+        clip-path="url(#avatarClip)"
+      />
+    `
+    : `
+      <circle
+        cx="205"
+        cy="285"
+        r="137"
+        fill="#111"
       />
 
       <text
-        x="${x + w / 2}"
-        y="${y + 37}"
+        x="205"
+        y="300"
         text-anchor="middle"
-        direction="rtl"
-        font-family="Arial, Tahoma, sans-serif"
-        font-size="19"
-        font-weight="700"
-        fill="#ff3340"
+        fill="#777"
+        font-size="35"
+        font-family="Arial"
       >
-        ${escapeXML(title)}
+        NEON
       </text>
+    `;
 
-      <text
-        x="${x + w / 2}"
-        y="${y + 87}"
-        text-anchor="middle"
-        direction="rtl"
-        font-family="Arial, Tahoma, sans-serif"
-        font-size="${String(value).length > 22 ? 16 : 23}"
-        font-weight="700"
-        fill="#f2f2f2"
-      >
-        ${escapeXML(value)}
-      </text>
-
-      <rect
-        x="${x + w / 2 - 28}"
-        y="${y + h - 17}"
-        width="56"
-        height="4"
-        rx="2"
-        fill="#ff2635"
-      />
-
-    </g>
-  `;
-
-  // =========================
+  // ====================================================
   // SVG
-  // =========================
+  // ====================================================
+
   const svg = `
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="${width}"
-    height="${height}"
-    viewBox="0 0 ${width} ${height}"
+    width="${WIDTH}"
+    height="${HEIGHT}"
+    viewBox="0 0 ${WIDTH} ${HEIGHT}"
   >
 
     <defs>
 
       <linearGradient
-        id="bg"
+        id="background"
         x1="0"
         y1="0"
         x2="1"
@@ -684,12 +710,12 @@ async function createDNAImage(
       >
         <stop
           offset="0%"
-          stop-color="#030303"
+          stop-color="#020202"
         />
 
         <stop
           offset="55%"
-          stop-color="#120000"
+          stop-color="#110000"
         />
 
         <stop
@@ -698,7 +724,8 @@ async function createDNAImage(
         />
       </linearGradient>
 
-      <filter id="glow">
+      <filter id="redGlow">
+
         <feGaussianBlur
           stdDeviation="5"
           result="blur"
@@ -708,86 +735,88 @@ async function createDNAImage(
           <feMergeNode in="blur"/>
           <feMergeNode in="SourceGraphic"/>
         </feMerge>
+
       </filter>
 
-      <radialGradient id="avatarRing">
+      <radialGradient
+        id="avatarBorder"
+      >
 
         <stop
-          offset="70%"
-          stop-color="#070707"
+          offset="65%"
+          stop-color="#090909"
         />
 
         <stop
-          offset="72%"
-          stop-color="#ff1627"
+          offset="75%"
+          stop-color="#ff1728"
         />
 
         <stop
-          offset="78%"
-          stop-color="#5b0008"
-        />
-
-        <stop
-          offset="84%"
-          stop-color="#ff1627"
+          offset="85%"
+          stop-color="#650009"
         />
 
         <stop
           offset="100%"
-          stop-color="#120000"
+          stop-color="#100000"
         />
 
       </radialGradient>
 
     </defs>
 
-    <!-- الخلفية -->
+    <!-- BACKGROUND -->
 
     <rect
       width="1400"
       height="1400"
       rx="45"
-      fill="url(#bg)"
+      fill="url(#background)"
     />
+
+    <!-- OUTER FRAME -->
 
     <path
       d="
-        M 30 145
-        L 95 110
-        H 1305
-        L 1370 145
+        M 30 140
+        L 90 105
+        H 1310
+        L 1370 140
         V 1260
-        L 1305 1295
-        H 95
+        L 1310 1295
+        H 90
         L 30 1260
         Z
       "
       fill="none"
-      stroke="#6b0008"
+      stroke="#690008"
       stroke-width="8"
     />
 
     <path
       d="
-        M 45 155
+        M 55 155
         L 90 130
         H 1310
-        L 1355 155
+        L 1345 155
       "
       fill="none"
       stroke="#ff1728"
       stroke-width="3"
-      filter="url(#glow)"
+      filter="url(#redGlow)"
     />
 
-    <!-- Header -->
+    <!-- ==================================================
+         HEADER
+         ================================================== -->
 
     <text
       x="78"
       y="62"
       font-family="Georgia, serif"
       font-size="48"
-      font-weight="700"
+      font-weight="bold"
       fill="#ff2837"
     >
       ♛ NEON
@@ -795,194 +824,191 @@ async function createDNAImage(
 
     <text
       x="80"
-      y="90"
+      y="89"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="15"
+      font-size="14"
       letter-spacing="5"
-      fill="#aaa"
+      fill="#999"
     >
       DISCORD SERVER
     </text>
 
+    <!-- الكلام اليمين مضبوط داخل الإطار -->
+
     <text
-      x="1315"
-      y="55"
+      x="1300"
+      y="53"
       text-anchor="end"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="22"
-      font-weight="700"
-      fill="#ff3340"
+      font-weight="bold"
+      fill="#ff2635"
     >
       أكثر من مجرد سيرفر
     </text>
 
     <text
-      x="1315"
-      y="84"
+      x="1300"
+      y="82"
       text-anchor="end"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="15"
-      fill="#aaa"
+      fill="#999"
     >
       نحن عائلة واحدة
     </text>
 
     <rect
-      x="65"
-      y="115"
-      width="1270"
-      height="2"
-      fill="#8d000c"
+      x="70"
+      y="112"
+      width="1260"
+      height="3"
+      fill="#ff1728"
+      filter="url(#redGlow)"
     />
 
-    <rect
-      x="95"
-      y="113"
-      width="1210"
-      height="5"
-      fill="#ff1d2d"
-      opacity="0.8"
-      filter="url(#glow)"
-    />
-
-    <!-- الجزء العلوي -->
+    <!-- ==================================================
+         TOP PROFILE
+         ================================================== -->
 
     <rect
       x="65"
-      y="155"
+      y="145"
       width="1270"
-      height="250"
-      rx="4"
+      height="255"
       fill="#030303"
-      stroke="#7e000b"
+      stroke="#72000b"
+      stroke-width="1"
     />
 
-    <!-- Avatar -->
+    <!-- AVATAR -->
 
     <circle
       cx="205"
       cy="285"
-      r="157"
-      fill="url(#avatarRing)"
+      r="153"
+      fill="url(#avatarBorder)"
     />
 
     <circle
       cx="205"
       cy="285"
-      r="149"
+      r="143"
       fill="#050505"
-      stroke="#ff1d2d"
+      stroke="#ff1728"
       stroke-width="3"
     />
 
-    ${avatarCircle}
+    ${avatarSVG}
 
-    <!-- حالة الأفاتار -->
+    <!-- ONLINE DOT -->
 
     <circle
-      cx="313"
-      cy="390"
-      r="26"
+      cx="314"
+      cy="389"
+      r="25"
       fill="#050505"
       stroke="#ff1728"
       stroke-width="4"
     />
 
     <circle
-      cx="313"
-      cy="390"
-      r="16"
+      cx="314"
+      cy="389"
+      r="15"
       fill="${status.color}"
     />
 
-    <!-- الاسم -->
+    <!-- ==================================================
+         NAME AREA
+         ================================================== -->
 
     <text
-      x="385"
-      y="240"
+      x="375"
+      y="225"
       direction="ltr"
       font-family="Arial, Tahoma, sans-serif"
       font-size="36"
-      font-weight="700"
-      fill="#f3f3f3"
+      font-weight="bold"
+      fill="#f5f5f5"
     >
       ${safeName}
     </text>
 
     <text
-      x="387"
-      y="273"
+      x="378"
+      y="258"
       direction="ltr"
       font-family="Arial, Tahoma, sans-serif"
       font-size="18"
-      fill="#8f8f8f"
+      fill="#888"
     >
       @${safeUsername}
     </text>
 
-    <!-- رقم العضو -->
+    <!-- MEMBER NUMBER -->
 
     <rect
-      x="385"
-      y="295"
-      width="355"
-      height="39"
-      rx="5"
-      fill="#090909"
-      stroke="#b60010"
+      x="375"
+      y="280"
+      width="365"
+      height="43"
+      rx="6"
+      fill="#080808"
+      stroke="#a90010"
       stroke-width="2"
     />
 
     <text
-      x="405"
-      y="321"
+      x="397"
+      y="308"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="17"
-      font-weight="700"
-      fill="#ff3340"
+      font-weight="bold"
+      fill="#ff2635"
     >
       رقم العضو
     </text>
 
     <text
-      x="720"
-      y="321"
+      x="715"
+      y="309"
       text-anchor="end"
       direction="ltr"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="19"
-      font-weight="700"
-      fill="#f4f4f4"
+      font-size="20"
+      font-weight="bold"
+      fill="#fff"
     >
-      #${escapeXML(memberNumber)}
+      #${memberNumber}
     </text>
 
-    <!-- الحالة -->
+    <!-- STATUS -->
 
     <rect
-      x="385"
-      y="345"
-      width="355"
-      height="39"
-      rx="5"
-      fill="#090909"
-      stroke="#b60010"
+      x="375"
+      y="335"
+      width="365"
+      height="43"
+      rx="6"
+      fill="#080808"
+      stroke="#a90010"
       stroke-width="2"
     />
 
     <circle
-      cx="407"
-      cy="364"
+      cx="398"
+      cy="356"
       r="7"
       fill="${status.color}"
     />
 
     <text
-      x="425"
-      y="371"
+      x="417"
+      y="362"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="16"
@@ -992,45 +1018,47 @@ async function createDNAImage(
     </text>
 
     <text
-      x="720"
-      y="371"
+      x="715"
+      y="363"
       text-anchor="end"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="18"
-      font-weight="700"
+      font-weight="bold"
       fill="${status.color}"
     >
-      ${escapeXML(status.text)}
+      ${status.text}
     </text>
 
-    <!-- ملف العضو -->
+    <!-- ==================================================
+         PROFILE BOX
+         ================================================== -->
 
     <path
       d="
-        M 785 180
+        M 790 175
         H 1260
-        L 1300 220
-        V 360
+        L 1295 210
+        V 365
         L 1260 400
-        H 785
-        L 750 365
-        V 215
+        H 790
+        L 755 365
+        V 210
         Z
       "
-      fill="#060606"
+      fill="#050505"
       stroke="#ff2635"
       stroke-width="2.5"
     />
 
     <text
       x="1025"
-      y="240"
+      y="235"
       text-anchor="middle"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
-      font-size="32"
-      font-weight="700"
+      font-size="31"
+      font-weight="bold"
       fill="#ff2635"
     >
       ملف العضو
@@ -1038,27 +1066,27 @@ async function createDNAImage(
 
     <text
       x="1025"
-      y="278"
+      y="272"
       text-anchor="middle"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
       font-size="17"
-      fill="#d0d0d0"
+      fill="#ddd"
     >
       بطاقة تعريف العضو
     </text>
 
     <rect
-      x="855"
-      y="300"
-      width="340"
+      x="850"
+      y="294"
+      width="350"
       height="2"
       fill="#ff2635"
     />
 
     <text
       x="1025"
-      y="338"
+      y="337"
       text-anchor="middle"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
@@ -1068,126 +1096,124 @@ async function createDNAImage(
       بيانات وإحصائيات العضو
     </text>
 
-    <!-- الإحصائيات الرئيسية -->
+    <!-- ==================================================
+         MAIN STATS
+         ================================================== -->
 
-    ${box(
+    ${bigBox(
       65,
-      430,
+      425,
       395,
-      190,
       'مدة العضوية',
-      membership,
-      'مدة وجود العضو داخل السيرفر'
+      'مدة وجود العضو داخل السيرفر',
+      membership
     )}
 
-    ${box(
+    ${bigBox(
       500,
-      430,
+      425,
       395,
-      190,
       'عدد الرسائل',
-      `${messages} رسالة`,
-      'إجمالي رسائل العضو'
+      'إجمالي رسائل العضو',
+      `${formatNumber(messages)} رسالة`
     )}
 
-    ${box(
+    ${bigBox(
       935,
-      430,
+      425,
       395,
-      190,
       'وقت المكالمات',
-      voice,
-      'إجمالي وقت وجود العضو في الفويس'
+      'إجمالي وقت وجود العضو في الفويس',
+      voice
     )}
 
-    <!-- الصف الثاني -->
+    <!-- ==================================================
+         SECOND ROW
+         ================================================== -->
 
     ${smallBox(
       65,
-      650,
+      645,
       290,
-      150,
       'حالة العضو',
       status.text
     )}
 
     ${smallBox(
       375,
-      650,
+      645,
       290,
-      150,
       'ترتيب العضو',
-      `#${number(memberNumber)}`
+      `#${formatNumber(memberNumber)}`
     )}
 
     ${smallBox(
       685,
-      650,
+      645,
       290,
-      150,
       'عدد الرتب',
-      `${number(roleCount)} رتبة`
+      `${formatNumber(roles)} رتبة`
     )}
 
     ${smallBox(
       995,
-      650,
+      645,
       335,
-      150,
       'عمر الحساب',
       accountAge
     )}
 
-    <!-- الصف الثالث -->
+    <!-- ==================================================
+         THIRD ROW
+         ================================================== -->
 
     ${smallBox(
       65,
-      830,
+      825,
       400,
-      150,
       'اسم العضو',
-      safeName
+      name
     )}
 
     ${smallBox(
       500,
-      830,
+      825,
       400,
-      150,
       'تاريخ الانضمام',
       joinDate
     )}
 
     ${smallBox(
       935,
-      830,
+      825,
       395,
-      150,
       'تاريخ إنشاء الحساب',
       accountDate
     )}
 
-    <!-- الصف الأخير -->
+    <!-- ==================================================
+         BOTTOM
+         ================================================== -->
 
     ${smallBox(
       65,
-      1010,
+      1005,
       600,
-      150,
       'معرّف العضو',
-      safeMemberId
+      safeID
     )}
 
     ${smallBox(
       700,
-      1010,
+      1005,
       630,
-      150,
       'اسم المستخدم',
       safeUsername
     )}
 
-    <!-- Footer -->
+    <!-- ==================================================
+         FOOTER
+         ================================================== -->
 
     <rect
       x="65"
@@ -1199,11 +1225,11 @@ async function createDNAImage(
 
     <text
       x="700"
-      y="1255"
+      y="1250"
       text-anchor="middle"
       font-family="Georgia, serif"
       font-size="38"
-      font-weight="700"
+      font-weight="bold"
       fill="#ff2635"
     >
       ♛ NEON
@@ -1211,7 +1237,7 @@ async function createDNAImage(
 
     <text
       x="700"
-      y="1282"
+      y="1278"
       text-anchor="middle"
       direction="rtl"
       font-family="Arial, Tahoma, sans-serif"
@@ -1231,9 +1257,9 @@ async function createDNAImage(
     .toBuffer();
 }
 
-// =========================
-// أمر /dna
-// =========================
+// ======================================================
+// SLASH COMMAND
+// ======================================================
 
 const commands = [
   new SlashCommandBuilder()
@@ -1241,7 +1267,9 @@ const commands = [
     .setDescription(
       'عرض بطاقة NEON DNA وإحصائيات العضو'
     )
-].map(command => command.toJSON());
+].map(
+  command => command.toJSON()
+);
 
 const rest =
   new REST({
@@ -1251,7 +1279,7 @@ const rest =
 async function registerCommands() {
   try {
     console.log(
-      '🔄 جاري تسجيل أمر /dna...'
+      '🔄 جاري تسجيل /dna...'
     );
 
     await rest.put(
@@ -1264,7 +1292,7 @@ async function registerCommands() {
     );
 
     console.log(
-      '✅ تم تسجيل أمر /dna بنجاح.'
+      '✅ تم تسجيل /dna.'
     );
 
   } catch (error) {
@@ -1275,9 +1303,9 @@ async function registerCommands() {
   }
 }
 
-// =========================
-// Ready
-// =========================
+// ======================================================
+// READY
+// ======================================================
 
 client.once(
   'ready',
@@ -1288,7 +1316,7 @@ client.once(
     );
 
     console.log(
-      `📌 قناة بطاقات الأعضاء: ${DNA_CHANNEL_ID}`
+      `📌 قناة DNA: ${DNA_CHANNEL_ID}`
     );
 
     await registerCommands();
@@ -1323,13 +1351,13 @@ client.once(
       }
     }
 
-    saveDataNow();
+    saveNow();
   }
 );
 
-// =========================
-// الرسائل
-// =========================
+// ======================================================
+// MESSAGE COUNTER
+// ======================================================
 
 client.on(
   'messageCreate',
@@ -1350,13 +1378,13 @@ client.on(
 
     memberData.messages++;
 
-    saveDataSoon();
+    saveSoon();
   }
 );
 
-// =========================
-// الفويس
-// =========================
+// ======================================================
+// VOICE COUNTER
+// ======================================================
 
 client.on(
   'voiceStateUpdate',
@@ -1366,7 +1394,9 @@ client.on(
       return;
     }
 
-    if (newState.member?.user?.bot) {
+    if (
+      newState.member?.user?.bot
+    ) {
       return;
     }
 
@@ -1376,7 +1406,7 @@ client.on(
         newState.id
       );
 
-    // دخول
+    // دخل الفويس
     if (
       !oldState.channelId &&
       newState.channelId
@@ -1385,17 +1415,19 @@ client.on(
       memberData.voiceStarted =
         Date.now();
 
-      saveDataSoon();
+      saveSoon();
       return;
     }
 
-    // خروج
+    // خرج من الفويس
     if (
       oldState.channelId &&
       !newState.channelId
     ) {
 
-      if (memberData.voiceStarted) {
+      if (
+        memberData.voiceStarted
+      ) {
 
         memberData.voiceSeconds +=
           Math.max(
@@ -1414,11 +1446,11 @@ client.on(
       memberData.voiceStarted =
         null;
 
-      saveDataSoon();
+      saveSoon();
       return;
     }
 
-    // نقل روم
+    // نقل من روم إلى روم
     if (
       oldState.channelId &&
       newState.channelId &&
@@ -1426,19 +1458,21 @@ client.on(
         newState.channelId
     ) {
 
-      if (!memberData.voiceStarted) {
+      if (
+        !memberData.voiceStarted
+      ) {
         memberData.voiceStarted =
           Date.now();
       }
 
-      saveDataSoon();
+      saveSoon();
     }
   }
 );
 
-// =========================
-// /dna
-// =========================
+// ======================================================
+// /DNA
+// ======================================================
 
 client.on(
   'interactionCreate',
@@ -1513,30 +1547,28 @@ client.on(
     } catch (error) {
 
       console.error(
-        '❌ خطأ أثناء إنشاء بطاقة DNA:',
+        '❌ خطأ أثناء إنشاء البطاقة:',
         error
       );
 
       try {
-
         await interaction.editReply({
           content:
             '❌ حدث خطأ أثناء إنشاء بطاقة العضو.'
         });
-
       } catch {}
     }
   }
 );
 
-// =========================
-// حفظ البيانات
-// =========================
+// ======================================================
+// SAFE SHUTDOWN
+// ======================================================
 
 process.on(
   'SIGINT',
   () => {
-    saveDataNow();
+    saveNow();
     process.exit(0);
   }
 );
@@ -1544,7 +1576,7 @@ process.on(
 process.on(
   'SIGTERM',
   () => {
-    saveDataNow();
+    saveNow();
     process.exit(0);
   }
 );
@@ -1552,18 +1584,20 @@ process.on(
 process.on(
   'uncaughtException',
   error => {
+
     console.error(
       '❌ uncaughtException:',
       error
     );
 
-    saveDataNow();
+    saveNow();
   }
 );
 
 process.on(
   'unhandledRejection',
   error => {
+
     console.error(
       '❌ unhandledRejection:',
       error
@@ -1571,8 +1605,8 @@ process.on(
   }
 );
 
-// =========================
-// Login
-// =========================
+// ======================================================
+// LOGIN
+// ======================================================
 
 client.login(TOKEN);
