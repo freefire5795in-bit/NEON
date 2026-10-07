@@ -57,6 +57,7 @@ if (fs.existsSync(DATA_FILE)) {
 let saveTimer = null;
 
 function getMemberData(guildId, userId) {
+
   if (!data[guildId]) {
     data[guildId] = {};
   }
@@ -65,42 +66,63 @@ function getMemberData(guildId, userId) {
     data[guildId][userId] = {
       messages: 0,
       voiceSeconds: 0,
-      voiceStarted: null
+      voiceStarted: null,
+      dnaMessageId: null
     };
+  }
+
+  // دعم البيانات القديمة
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      data[guildId][userId],
+      'dnaMessageId'
+    )
+  ) {
+    data[guildId][userId].dnaMessageId = null;
   }
 
   return data[guildId][userId];
 }
 
 function saveSoon() {
+
   if (saveTimer) return;
 
   saveTimer = setTimeout(() => {
+
     saveTimer = null;
 
     try {
+
       fs.writeFileSync(
         DATA_FILE,
         JSON.stringify(data, null, 2),
         'utf8'
       );
+
     } catch (error) {
+
       console.error(
         '❌ خطأ في حفظ البيانات:',
         error
       );
     }
+
   }, 3000);
 }
 
 function saveNow() {
+
   try {
+
     fs.writeFileSync(
       DATA_FILE,
       JSON.stringify(data, null, 2),
       'utf8'
     );
+
   } catch (error) {
+
     console.error(
       '❌ خطأ في حفظ البيانات:',
       error
@@ -113,6 +135,7 @@ function saveNow() {
 // ======================================================
 
 function escapeXML(value) {
+
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -122,10 +145,13 @@ function escapeXML(value) {
 }
 
 function formatNumber(value) {
-  return Number(value || 0).toLocaleString('en-US');
+
+  return Number(value || 0)
+    .toLocaleString('en-US');
 }
 
 function fitText(text, max) {
+
   text = String(text || '');
 
   if (text.length <= max) {
@@ -140,19 +166,24 @@ function fitText(text, max) {
 // ======================================================
 
 function formatDate(date) {
-  if (!date || Number.isNaN(date.getTime())) {
+
+  if (
+    !date ||
+    Number.isNaN(date.getTime())
+  ) {
     return 'غير معروف';
   }
 
-  const day = String(
-    date.getDate()
-  ).padStart(2, '0');
+  const day =
+    String(date.getDate())
+      .padStart(2, '0');
 
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, '0');
+  const month =
+    String(date.getMonth() + 1)
+      .padStart(2, '0');
 
-  const year = date.getFullYear();
+  const year =
+    date.getFullYear();
 
   return `${day}/${month}/${year}`;
 }
@@ -162,33 +193,50 @@ function formatDate(date) {
 // ======================================================
 
 function getAccountAge(createdAt) {
-  if (!createdAt) return 'غير معروف';
+
+  if (!createdAt) {
+    return 'غير معروف';
+  }
 
   const now = new Date();
 
   let months =
-    (now.getFullYear() - createdAt.getFullYear()) * 12 +
-    (now.getMonth() - createdAt.getMonth());
+    (now.getFullYear() -
+      createdAt.getFullYear()) * 12 +
+    (now.getMonth() -
+      createdAt.getMonth());
 
-  if (now.getDate() < createdAt.getDate()) {
+  if (
+    now.getDate() <
+    createdAt.getDate()
+  ) {
     months--;
   }
 
-  months = Math.max(0, months);
+  months =
+    Math.max(0, months);
 
   if (months >= 12) {
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
+
+    const years =
+      Math.floor(months / 12);
+
+    const remainingMonths =
+      months % 12;
 
     if (remainingMonths > 0) {
+
       return `${years} سنة و ${remainingMonths} شهر`;
+
     }
 
     return `${years} سنة`;
   }
 
   if (months > 0) {
+
     return `${months} شهور`;
+
   }
 
   return 'أقل من شهر';
@@ -199,6 +247,7 @@ function getAccountAge(createdAt) {
 // ======================================================
 
 function getMembershipTime(joinedAt) {
+
   if (!joinedAt) {
     return 'غير معروف';
   }
@@ -206,7 +255,8 @@ function getMembershipTime(joinedAt) {
   const difference =
     Math.max(
       0,
-      Date.now() - joinedAt.getTime()
+      Date.now() -
+      joinedAt.getTime()
     );
 
   const totalHours =
@@ -230,30 +280,44 @@ function getMembershipTime(joinedAt) {
 // ======================================================
 
 function formatVoiceTime(seconds) {
-  seconds = Math.max(
-    0,
-    Math.floor(Number(seconds) || 0)
-  );
+
+  seconds =
+    Math.max(
+      0,
+      Math.floor(
+        Number(seconds) || 0
+      )
+    );
 
   const days =
-    Math.floor(seconds / 86400);
+    Math.floor(
+      seconds / 86400
+    );
 
   seconds %= 86400;
 
   const hours =
-    Math.floor(seconds / 3600);
+    Math.floor(
+      seconds / 3600
+    );
 
   seconds %= 3600;
 
   const minutes =
-    Math.floor(seconds / 60);
+    Math.floor(
+      seconds / 60
+    );
 
   if (days > 0) {
+
     return `${formatNumber(days)} يوم و ${formatNumber(hours)} ساعة`;
+
   }
 
   if (hours > 0) {
+
     return `${formatNumber(hours)} ساعة و ${formatNumber(minutes)} دقيقة`;
+
   }
 
   return `${formatNumber(minutes)} دقيقة`;
@@ -264,8 +328,11 @@ function formatVoiceTime(seconds) {
 // ======================================================
 
 function getStatus(member) {
+
   const presence =
-    member.guild.presences.cache.get(member.id);
+    member.guild.presences.cache.get(
+      member.id
+    );
 
   const status =
     presence?.status ||
@@ -273,24 +340,30 @@ function getStatus(member) {
     'offline';
 
   if (status === 'online') {
+
     return {
       text: 'متصل',
       color: '#32e875'
     };
+
   }
 
   if (status === 'idle') {
+
     return {
       text: 'خامل',
       color: '#f0b429'
     };
+
   }
 
   if (status === 'dnd') {
+
     return {
       text: 'مشغول',
       color: '#ff4141'
     };
+
   }
 
   return {
@@ -303,35 +376,53 @@ function getStatus(member) {
 // MEMBER NUMBER
 // ======================================================
 
-async function getMemberNumber(guild, target) {
+async function getMemberNumber(
+  guild,
+  target
+) {
+
   try {
+
     const members =
       await guild.members.fetch();
 
     const humans =
       [...members.values()]
         .filter(
-          member => !member.user.bot
+          member =>
+            !member.user.bot
         )
         .sort(
           (a, b) => {
+
             const aTime =
-              a.joinedTimestamp || Infinity;
+              a.joinedTimestamp ||
+              Infinity;
 
             const bTime =
-              b.joinedTimestamp || Infinity;
+              b.joinedTimestamp ||
+              Infinity;
 
-            if (aTime === bTime) {
-              return a.id.localeCompare(b.id);
+            if (
+              aTime === bTime
+            ) {
+
+              return a.id.localeCompare(
+                b.id
+              );
+
             }
 
             return aTime - bTime;
+
           }
         );
 
     const index =
       humans.findIndex(
-        member => member.id === target.id
+        member =>
+          member.id ===
+          target.id
       );
 
     return index >= 0
@@ -339,6 +430,7 @@ async function getMemberNumber(guild, target) {
       : 1;
 
   } catch (error) {
+
     console.error(
       '❌ خطأ في حساب رقم العضو:',
       error
@@ -353,7 +445,9 @@ async function getMemberNumber(guild, target) {
 // ======================================================
 
 async function getAvatar(member) {
+
   try {
+
     const url =
       member.user.displayAvatarURL({
         extension: 'png',
@@ -365,9 +459,11 @@ async function getAvatar(member) {
       await fetch(url);
 
     if (!response.ok) {
+
       throw new Error(
         `HTTP ${response.status}`
       );
+
     }
 
     const buffer =
@@ -377,9 +473,13 @@ async function getAvatar(member) {
 
     const image =
       await sharp(buffer)
-        .resize(512, 512, {
-          fit: 'cover'
-        })
+        .resize(
+          512,
+          512,
+          {
+            fit: 'cover'
+          }
+        )
         .png()
         .toBuffer();
 
@@ -389,6 +489,7 @@ async function getAvatar(member) {
     );
 
   } catch (error) {
+
     console.error(
       '⚠️ مشكلة في الأفاتار:',
       error
@@ -407,6 +508,7 @@ async function createDNAImage(
   memberData,
   memberNumber
 ) {
+
   const WIDTH = 1400;
   const HEIGHT = 1400;
 
@@ -466,14 +568,20 @@ async function createDNAImage(
       memberData.voiceSeconds || 0
     );
 
-  if (memberData.voiceStarted) {
+  if (
+    memberData.voiceStarted
+  ) {
+
     voiceSeconds +=
       Math.floor(
         (
           Date.now() -
-          Number(memberData.voiceStarted)
+          Number(
+            memberData.voiceStarted
+          )
         ) / 1000
       );
+
   }
 
   const voice =
@@ -488,7 +596,9 @@ async function createDNAImage(
     escapeXML(username);
 
   const safeID =
-    escapeXML(member.user.id);
+    escapeXML(
+      member.user.id
+    );
 
   // ====================================================
   // BOX
@@ -502,6 +612,7 @@ async function createDNAImage(
     subtitle,
     value
   ) {
+
     return `
       <g>
 
@@ -580,6 +691,7 @@ async function createDNAImage(
     title,
     value
   ) {
+
     return `
       <g>
 
@@ -660,6 +772,7 @@ async function createDNAImage(
         x2="1"
         y2="1"
       >
+
         <stop
           offset="0%"
           stop-color="#020202"
@@ -674,6 +787,7 @@ async function createDNAImage(
           offset="100%"
           stop-color="#020202"
         />
+
       </linearGradient>
 
       <filter id="redGlow">
@@ -772,7 +886,7 @@ async function createDNAImage(
       ♛ NEON
     </text>
 
-    <!-- تم حذف الكلام الموجود أعلى اليمين -->
+    <!-- الكلام الموجود أعلى اليمين تم حذفه -->
 
     <rect
       x="70"
@@ -819,13 +933,17 @@ async function createDNAImage(
       avatar
         ? `
       <defs>
+
         <clipPath id="avatarClip">
+
           <circle
             cx="195"
             cy="280"
             r="99"
           />
+
         </clipPath>
+
       </defs>
 
       <image
@@ -1145,7 +1263,9 @@ const rest =
   }).setToken(TOKEN);
 
 async function registerCommands() {
+
   try {
+
     console.log(
       '🔄 جاري تسجيل /dna...'
     );
@@ -1164,10 +1284,12 @@ async function registerCommands() {
     );
 
   } catch (error) {
+
     console.error(
       '❌ خطأ في تسجيل الأمر:',
       error
     );
+
   }
 }
 
@@ -1209,12 +1331,18 @@ client.once(
             member.id
           );
 
-        if (member.voice?.channelId) {
+        if (
+          member.voice?.channelId
+        ) {
+
           memberData.voiceStarted =
             Date.now();
+
         } else {
+
           memberData.voiceStarted =
             null;
+
         }
       }
     }
@@ -1274,6 +1402,8 @@ client.on(
         newState.id
       );
 
+    // دخل الفويس
+
     if (
       !oldState.channelId &&
       newState.channelId
@@ -1283,8 +1413,11 @@ client.on(
         Date.now();
 
       saveSoon();
+
       return;
     }
+
+    // خرج من الفويس
 
     if (
       oldState.channelId &&
@@ -1301,7 +1434,9 @@ client.on(
             Math.floor(
               (
                 Date.now() -
-                Number(memberData.voiceStarted)
+                Number(
+                  memberData.voiceStarted
+                )
               ) / 1000
             )
           );
@@ -1311,8 +1446,11 @@ client.on(
         null;
 
       saveSoon();
+
       return;
     }
+
+    // نقل من روم إلى روم
 
     if (
       oldState.channelId &&
@@ -1324,8 +1462,10 @@ client.on(
       if (
         !memberData.voiceStarted
       ) {
+
         memberData.voiceStarted =
           Date.now();
+
       }
 
       saveSoon();
@@ -1382,11 +1522,52 @@ client.on(
           member.id
         );
 
+      // ==================================================
+      // حذف البطاقة القديمة لنفس العضو فقط
+      // ==================================================
+
+      if (
+        memberData.dnaMessageId
+      ) {
+
+        try {
+
+          const oldMessage =
+            await interaction.channel.messages.fetch(
+              memberData.dnaMessageId
+            );
+
+          if (
+            oldMessage &&
+            oldMessage.author.id ===
+              client.user.id
+          ) {
+
+            await oldMessage.delete();
+
+          }
+
+        } catch {
+          // البطاقة القديمة غير موجودة
+        }
+
+        memberData.dnaMessageId =
+          null;
+      }
+
+      // ==================================================
+      // MEMBER NUMBER
+      // ==================================================
+
       const memberNumber =
         await getMemberNumber(
           interaction.guild,
           member
         );
+
+      // ==================================================
+      // CREATE IMAGE
+      // ==================================================
 
       const image =
         await createDNAImage(
@@ -1404,9 +1585,25 @@ client.on(
           }
         );
 
+      // ==================================================
+      // SEND CARD
+      // ==================================================
+
       await interaction.editReply({
         files: [file]
       });
+
+      // ==================================================
+      // SAVE NEW MESSAGE ID
+      // ==================================================
+
+      const newMessage =
+        await interaction.fetchReply();
+
+      memberData.dnaMessageId =
+        newMessage.id;
+
+      saveSoon();
 
     } catch (error) {
 
@@ -1416,10 +1613,12 @@ client.on(
       );
 
       try {
+
         await interaction.editReply({
           content:
             '❌ حدث خطأ أثناء إنشاء بطاقة العضو.'
         });
+
       } catch {}
     }
   }
@@ -1432,7 +1631,9 @@ client.on(
 process.on(
   'SIGINT',
   () => {
+
     saveNow();
+
     process.exit(0);
   }
 );
@@ -1440,7 +1641,9 @@ process.on(
 process.on(
   'SIGTERM',
   () => {
+
     saveNow();
+
     process.exit(0);
   }
 );
@@ -1466,6 +1669,7 @@ process.on(
       '❌ unhandledRejection:',
       error
     );
+
   }
 );
 
