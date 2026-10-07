@@ -303,10 +303,7 @@ function getStatus(member) {
 // MEMBER NUMBER
 // ======================================================
 
-async function getMemberNumber(
-  guild,
-  target
-) {
+async function getMemberNumber(guild, target) {
   try {
     const members =
       await guild.members.fetch();
@@ -334,8 +331,7 @@ async function getMemberNumber(
 
     const index =
       humans.findIndex(
-        member =>
-          member.id === target.id
+        member => member.id === target.id
       );
 
     return index >= 0
@@ -475,9 +471,7 @@ async function createDNAImage(
       Math.floor(
         (
           Date.now() -
-          Number(
-            memberData.voiceStarted
-          )
+          Number(memberData.voiceStarted)
         ) / 1000
       );
   }
@@ -778,41 +772,7 @@ async function createDNAImage(
       ♛ NEON
     </text>
 
-    <text
-      x="80"
-      y="89"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="14"
-      letter-spacing="5"
-      fill="#999"
-    >
-      DISCORD SERVER
-    </text>
-
-    <text
-      x="1300"
-      y="53"
-      text-anchor="end"
-      direction="rtl"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="22"
-      font-weight="bold"
-      fill="#ff2635"
-    >
-      أكثر من مجرد سيرفر
-    </text>
-
-    <text
-      x="1300"
-      y="82"
-      text-anchor="end"
-      direction="rtl"
-      font-family="Arial, Tahoma, sans-serif"
-      font-size="15"
-      fill="#999"
-    >
-      نحن عائلة واحدة
-    </text>
+    <!-- تم حذف الكلام الموجود أعلى اليمين -->
 
     <rect
       x="70"
@@ -838,8 +798,6 @@ async function createDNAImage(
     />
 
     <!-- ================= AVATAR ================= -->
-
-    <!-- الأفاتار بدون أي تغيير -->
 
     <circle
       cx="195"
@@ -903,8 +861,6 @@ async function createDNAImage(
 
     <!-- ================= STATUS DOT ================= -->
 
-    <!-- نقطة الحالة كما هي -->
-
     <circle
       cx="274"
       cy="357"
@@ -921,11 +877,7 @@ async function createDNAImage(
       fill="${status.color}"
     />
 
-    <!-- ==================================================
-         هنا التعديل فقط:
-         حذف رقم العضو وحالة العضو من أعلى البطاقة
-         ووضع الاسم والهاشتاج مكانهم
-         ================================================== -->
+    <!-- ================= NAME ================= -->
 
     <text
       x="335"
@@ -1349,9 +1301,7 @@ client.on(
             Math.floor(
               (
                 Date.now() -
-                Number(
-                  memberData.voiceStarted
-                )
+                Number(memberData.voiceStarted)
               ) / 1000
             )
           );
