@@ -12,23 +12,18 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-// ==============================
-// الإعدادات
-// ==============================
+// ======================================================
+// SETTINGS
+// ======================================================
 
 const CLIENT_ID = '1557370938650271824';
 const DNA_CHANNEL_ID = '1557391771527553125';
-
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
   console.error('❌ DISCORD_TOKEN غير موجود.');
   process.exit(1);
 }
-
-// ==============================
-// البوت
-// ==============================
 
 const client = new Client({
   intents: [
@@ -41,9 +36,9 @@ const client = new Client({
   ]
 });
 
-// ==============================
-// ملف البيانات
-// ==============================
+// ======================================================
+// DATA
+// ======================================================
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -54,17 +49,28 @@ if (fs.existsSync(DATA_FILE)) {
     data = JSON.parse(
       fs.readFileSync(DATA_FILE, 'utf8')
     );
-  } catch (error) {
-    console.error('⚠️ ملف البيانات تالف، سيتم إنشاء ملف جديد.');
+  } catch {
     data = {};
   }
 }
 
-// ==============================
-// الحفظ
-// ==============================
-
 let saveTimer = null;
+
+function getMemberData(guildId, userId) {
+  if (!data[guildId]) {
+    data[guildId] = {};
+  }
+
+  if (!data[guildId][userId]) {
+    data[guildId][userId] = {
+      messages: 0,
+      voiceSeconds: 0,
+      voiceStarted: null
+    };
+  }
+
+  return data[guildId][userId];
+}
 
 function saveSoon() {
   if (saveTimer) return;
@@ -79,7 +85,10 @@ function saveSoon() {
         'utf8'
       );
     } catch (error) {
-      console.error('❌ خطأ في حفظ البيانات:', error);
+      console.error(
+        '❌ خطأ في حفظ البيانات:',
+        error
+      );
     }
   }, 3000);
 }
@@ -92,87 +101,16 @@ function saveNow() {
       'utf8'
     );
   } catch (error) {
-    console.error('❌ خطأ في حفظ البيانات:', error);
+    console.error(
+      '❌ خطأ في حفظ البيانات:',
+      error
+    );
   }
 }
 
-// ==============================
-// بيانات العضو
-// ==============================
-
-function getMemberData(guildId, userId) {
-  if (!data[guildId]) {
-    data[guildId] = {};
-  }
-
-  if (!data[guildId][userId]) {
-    data[guildId][userId] = {
-      messages: 0,
-      voiceSeconds: 0,
-      voiceStarted: null,
-      memberNumber: null
-    };
-  }
-
-  // دعم البيانات القديمة
-  if (!('memberNumber' in data[guildId][userId])) {
-    data[guildId][userId].memberNumber = null;
-  }
-
-  if (!('messages' in data[guildId][userId])) {
-    data[guildId][userId].messages = 0;
-  }
-
-  if (!('voiceSeconds' in data[guildId][userId])) {
-    data[guildId][userId].voiceSeconds = 0;
-  }
-
-  if (!('voiceStarted' in data[guildId][userId])) {
-    data[guildId][userId].voiceStarted = null;
-  }
-
-  return data[guildId][userId];
-}
-
-// ==============================
-// رقم العضو التلقائي
-// ==============================
-
-function assignMemberNumber(guildId, userId) {
-  const memberData = getMemberData(guildId, userId);
-
-  // لو العضو عنده رقم بالفعل
-  // يفضل الرقم ثابت
-  if (
-    memberData.memberNumber !== null &&
-    Number(memberData.memberNumber) > 0
-  ) {
-    return Number(memberData.memberNumber);
-  }
-
-  if (!data[guildId]) {
-    data[guildId] = {};
-  }
-
-  const numbers = Object.values(data[guildId])
-    .map(member => Number(member.memberNumber) || 0)
-    .filter(number => number > 0);
-
-  const nextNumber =
-    numbers.length > 0
-      ? Math.max(...numbers) + 1
-      : 1;
-
-  memberData.memberNumber = nextNumber;
-
-  saveSoon();
-
-  return nextNumber;
-}
-
-// ==============================
-// أدوات
-// ==============================
+// ======================================================
+// TEXT
+// ======================================================
 
 function escapeXML(value) {
   return String(value ?? '')
@@ -197,30 +135,34 @@ function fitText(text, max) {
   return text.substring(0, max - 3) + '...';
 }
 
-// ==============================
-// التاريخ
-// ==============================
+// ======================================================
+// DATE
+// ======================================================
 
 function formatDate(date) {
   if (!date || Number.isNaN(date.getTime())) {
     return 'غير معروف';
   }
 
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(
+    date.getDate()
+  ).padStart(2, '0');
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, '0');
+
   const year = date.getFullYear();
 
   return `${day}/${month}/${year}`;
 }
 
-// ==============================
-// عمر الحساب
-// ==============================
+// ======================================================
+// ACCOUNT AGE
+// ======================================================
 
 function getAccountAge(createdAt) {
-  if (!createdAt) {
-    return 'غير معروف';
-  }
+  if (!createdAt) return 'غير معروف';
 
   const now = new Date();
 
@@ -252,141 +194,217 @@ function getAccountAge(createdAt) {
   return 'أقل من شهر';
 }
 
-// ==============================
-// مدة العضوية
-// ==============================
+// ======================================================
+// MEMBERSHIP
+// ======================================================
 
 function getMembershipTime(joinedAt) {
   if (!joinedAt) {
     return 'غير معروف';
   }
 
-  const difference = Math.max(
-    0,
-    Date.now() - joinedAt.getTime()
-  );
+  const difference =
+    Math.max(
+      0,
+      Date.now() - joinedAt.getTime()
+    );
 
-  const totalHours = Math.floor(
-    difference / 3600000
-  );
+  const totalHours =
+    Math.floor(
+      difference / 3600000
+    );
 
-  const days = Math.floor(
-    totalHours / 24
-  );
+  const days =
+    Math.floor(
+      totalHours / 24
+    );
 
-  const hours = totalHours % 24;
+  const hours =
+    totalHours % 24;
 
   return `${formatNumber(days)} يوم و ${formatNumber(hours)} ساعة`;
 }
 
-// ==============================
-// وقت الفويس
-// ==============================
+// ======================================================
+// VOICE TIME
+// ======================================================
 
 function formatVoiceTime(seconds) {
   seconds = Math.max(
     0,
-    Number(seconds || 0)
+    Math.floor(Number(seconds) || 0)
   );
 
-  const days = Math.floor(
-    seconds / 86400
-  );
+  const days =
+    Math.floor(seconds / 86400);
 
   seconds %= 86400;
 
-  const hours = Math.floor(
-    seconds / 3600
-  );
+  const hours =
+    Math.floor(seconds / 3600);
 
   seconds %= 3600;
 
-  const minutes = Math.floor(
-    seconds / 60
-  );
+  const minutes =
+    Math.floor(seconds / 60);
 
   if (days > 0) {
-    return `${days} يوم و ${hours} ساعة`;
+    return `${formatNumber(days)} يوم و ${formatNumber(hours)} ساعة`;
   }
 
   if (hours > 0) {
-    return `${hours} ساعة و ${minutes} دقيقة`;
+    return `${formatNumber(hours)} ساعة و ${formatNumber(minutes)} دقيقة`;
   }
 
-  return `${minutes} دقيقة`;
+  return `${formatNumber(minutes)} دقيقة`;
 }
 
-// ==============================
-// حالة العضو
-// ==============================
+// ======================================================
+// STATUS
+// ======================================================
 
 function getStatus(member) {
+  const presence =
+    member.guild.presences.cache.get(member.id);
+
   const status =
-    member.presence?.status || 'offline';
+    presence?.status ||
+    member.presence?.status ||
+    'offline';
 
   if (status === 'online') {
     return {
       text: 'متصل',
-      color: '#43B581'
+      color: '#32e875'
     };
   }
 
   if (status === 'idle') {
     return {
       text: 'خامل',
-      color: '#FAA61A'
+      color: '#f0b429'
     };
   }
 
   if (status === 'dnd') {
     return {
       text: 'مشغول',
-      color: '#F04747'
+      color: '#ff4141'
     };
   }
 
   return {
     text: 'غير متصل',
-    color: '#747F8D'
+    color: '#777777'
   };
 }
 
-// ==============================
-// الأفاتار
-// ==============================
+// ======================================================
+// MEMBER NUMBER
+// ======================================================
+
+async function getMemberNumber(
+  guild,
+  target
+) {
+  try {
+    const members =
+      await guild.members.fetch();
+
+    const humans =
+      [...members.values()]
+        .filter(
+          member => !member.user.bot
+        )
+        .sort(
+          (a, b) => {
+            const aTime =
+              a.joinedTimestamp || Infinity;
+
+            const bTime =
+              b.joinedTimestamp || Infinity;
+
+            if (aTime === bTime) {
+              return a.id.localeCompare(b.id);
+            }
+
+            return aTime - bTime;
+          }
+        );
+
+    const index =
+      humans.findIndex(
+        member =>
+          member.id === target.id
+      );
+
+    return index >= 0
+      ? index + 1
+      : 1;
+
+  } catch (error) {
+    console.error(
+      '❌ خطأ في حساب رقم العضو:',
+      error
+    );
+
+    return 1;
+  }
+}
+
+// ======================================================
+// AVATAR
+// ======================================================
 
 async function getAvatar(member) {
   try {
-    const url = member.displayAvatarURL({
-      extension: 'png',
-      size: 512,
-      forceStatic: true
-    });
+    const url =
+      member.user.displayAvatarURL({
+        extension: 'png',
+        size: 512,
+        forceStatic: true
+      });
 
-    const response = await fetch(url);
+    const response =
+      await fetch(url);
 
     if (!response.ok) {
       throw new Error(
-        `Avatar HTTP ${response.status}`
+        `HTTP ${response.status}`
       );
     }
 
-    return Buffer.from(
-      await response.arrayBuffer()
+    const buffer =
+      Buffer.from(
+        await response.arrayBuffer()
+      );
+
+    const image =
+      await sharp(buffer)
+        .resize(512, 512, {
+          fit: 'cover'
+        })
+        .png()
+        .toBuffer();
+
+    return (
+      'data:image/png;base64,' +
+      image.toString('base64')
     );
+
   } catch (error) {
     console.error(
-      '⚠️ فشل تحميل الأفاتار:',
-      error.message
+      '⚠️ مشكلة في الأفاتار:',
+      error
     );
 
     return null;
   }
 }
 
-// ==============================
-// إنشاء صورة DNA
-// ==============================
+// ======================================================
+// MAIN CARD
+// ======================================================
 
 async function createDNAImage(
   member,
@@ -396,56 +414,78 @@ async function createDNAImage(
   const WIDTH = 1400;
   const HEIGHT = 1400;
 
-  const avatar = await getAvatar(member);
+  const avatar =
+    await getAvatar(member);
 
-  const status = getStatus(member);
+  const status =
+    getStatus(member);
 
-  const name = fitText(
-    member.displayName ||
-    member.user.globalName ||
-    member.user.username,
-    20
-  );
+  const name =
+    fitText(
+      member.displayName ||
+      member.user.globalName ||
+      member.user.username,
+      20
+    );
 
-  const username = fitText(
-    member.user.username,
-    27
-  );
+  const username =
+    fitText(
+      member.user.username,
+      27
+    );
 
   const membership =
-    getMembershipTime(member.joinedAt);
+    getMembershipTime(
+      member.joinedAt
+    );
 
   const accountAge =
-    getAccountAge(member.user.createdAt);
+    getAccountAge(
+      member.user.createdAt
+    );
 
   const joinDate =
-    formatDate(member.joinedAt);
+    formatDate(
+      member.joinedAt
+    );
 
   const accountDate =
-    formatDate(member.user.createdAt);
+    formatDate(
+      member.user.createdAt
+    );
 
-  const roles = Math.max(
-    0,
-    member.roles.cache.size - 1
-  );
+  const roles =
+    Math.max(
+      0,
+      member.roles.cache.size - 1
+    );
 
   const messages =
-    Number(memberData.messages || 0);
+    Number(
+      memberData.messages || 0
+    );
 
   let voiceSeconds =
-    Number(memberData.voiceSeconds || 0);
+    Number(
+      memberData.voiceSeconds || 0
+    );
 
   if (memberData.voiceStarted) {
-    voiceSeconds += Math.floor(
-      (
-        Date.now() -
-        Number(memberData.voiceStarted)
-      ) / 1000
-    );
+    voiceSeconds +=
+      Math.floor(
+        (
+          Date.now() -
+          Number(
+            memberData.voiceStarted
+          )
+        ) / 1000
+      );
   }
 
   const voice =
-    formatVoiceTime(voiceSeconds);
+    formatVoiceTime(
+      voiceSeconds
+    );
 
   const safeName =
     escapeXML(name);
@@ -456,808 +496,754 @@ async function createDNAImage(
   const safeID =
     escapeXML(member.user.id);
 
-  const safeStatus =
-    escapeXML(status.text);
+  // ====================================================
+  // BOX
+  // ====================================================
 
-  const safeMembership =
-    escapeXML(membership);
+  function bigBox(
+    x,
+    y,
+    width,
+    title,
+    subtitle,
+    value
+  ) {
+    return `
+      <g>
 
-  const safeAccountAge =
-    escapeXML(accountAge);
+        <path
+          d="
+            M ${x + 25} ${y}
+            H ${x + width - 25}
+            L ${x + width} ${y + 25}
+            V ${y + 165}
+            L ${x + width - 25} ${y + 190}
+            H ${x + 25}
+            L ${x} ${y + 165}
+            V ${y + 25}
+            Z
+          "
+          fill="#050505"
+          stroke="#e51a2a"
+          stroke-width="2"
+        />
 
-  const safeJoinDate =
-    escapeXML(joinDate);
+        <text
+          x="${x + width / 2}"
+          y="${y + 42}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="21"
+          font-weight="bold"
+          fill="#ff2635"
+        >
+          ${escapeXML(title)}
+        </text>
 
-  const safeAccountDate =
-    escapeXML(accountDate);
+        <text
+          x="${x + width / 2}"
+          y="${y + 73}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="14"
+          fill="#777"
+        >
+          ${escapeXML(subtitle)}
+        </text>
 
-  const safeVoice =
-    escapeXML(voice);
+        <text
+          x="${x + width / 2}"
+          y="${y + 135}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="${String(value).length > 25 ? 19 : 25}"
+          font-weight="bold"
+          fill="#f5f5f5"
+        >
+          ${escapeXML(value)}
+        </text>
 
-  // ==============================
-  // الأفاتار
-  // ==============================
+        <rect
+          x="${x + width / 2 - 34}"
+          y="${y + 166}"
+          width="68"
+          height="4"
+          rx="2"
+          fill="#ff2635"
+        />
 
-  let avatarBase64 = '';
-
-  if (avatar) {
-    avatarBase64 =
-      `data:image/png;base64,${avatar.toString('base64')}`;
+      </g>
+    `;
   }
 
-  // ==============================
+  function smallBox(
+    x,
+    y,
+    width,
+    title,
+    value
+  ) {
+    return `
+      <g>
+
+        <path
+          d="
+            M ${x + 18} ${y}
+            H ${x + width - 18}
+            L ${x + width} ${y + 18}
+            V ${y + 132}
+            L ${x + width - 18} ${y + 150}
+            H ${x + 18}
+            L ${x} ${y + 132}
+            V ${y + 18}
+            Z
+          "
+          fill="#050505"
+          stroke="#b91423"
+          stroke-width="1.8"
+        />
+
+        <text
+          x="${x + width / 2}"
+          y="${y + 38}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="18"
+          font-weight="bold"
+          fill="#ff2635"
+        >
+          ${escapeXML(title)}
+        </text>
+
+        <text
+          x="${x + width / 2}"
+          y="${y + 88}"
+          text-anchor="middle"
+          direction="rtl"
+          font-family="Arial, Tahoma, sans-serif"
+          font-size="${String(value).length > 20 ? 16 : 22}"
+          font-weight="bold"
+          fill="#f2f2f2"
+        >
+          ${escapeXML(value)}
+        </text>
+
+        <rect
+          x="${x + width / 2 - 28}"
+          y="${y + 132}"
+          width="56"
+          height="4"
+          rx="2"
+          fill="#ff2635"
+        />
+
+      </g>
+    `;
+  }
+
+  // ====================================================
   // SVG
-  // ==============================
+  // ====================================================
 
   const svg = `
-<svg
-  width="${WIDTH}"
-  height="${HEIGHT}"
-  viewBox="0 0 ${WIDTH} ${HEIGHT}"
-  xmlns="http://www.w3.org/2000/svg"
->
-
-  <defs>
-
-    <linearGradient
-      id="bg"
-      x1="0"
-      y1="0"
-      x2="1"
-      y2="1"
-    >
-      <stop offset="0%" stop-color="#080B12"/>
-      <stop offset="50%" stop-color="#101722"/>
-      <stop offset="100%" stop-color="#05070C"/>
-    </linearGradient>
-
-    <linearGradient
-      id="card"
-      x1="0"
-      y1="0"
-      x2="1"
-      y2="1"
-    >
-      <stop offset="0%" stop-color="#151C29"/>
-      <stop offset="100%" stop-color="#0C111A"/>
-    </linearGradient>
-
-    <linearGradient
-      id="line"
-      x1="0"
-      y1="0"
-      x2="1"
-      y2="0"
-    >
-      <stop offset="0%" stop-color="#5865F2"/>
-      <stop offset="50%" stop-color="#8B5CF6"/>
-      <stop offset="100%" stop-color="#5865F2"/>
-    </linearGradient>
-
-    <filter
-      id="shadow"
-      x="-50%"
-      y="-50%"
-      width="200%"
-      height="200%"
-    >
-      <feDropShadow
-        dx="0"
-        dy="10"
-        stdDeviation="15"
-        flood-color="#000000"
-        flood-opacity="0.45"
-      />
-    </filter>
-
-    <clipPath id="avatarClip">
-      <circle
-        cx="195"
-        cy="280"
-        r="124"
-      />
-    </clipPath>
-
-  </defs>
-
-  <!-- ========================== -->
-  <!-- الخلفية -->
-  <!-- ========================== -->
-
-  <rect
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
     width="${WIDTH}"
     height="${HEIGHT}"
-    fill="url(#bg)"
-  />
-
-  <rect
-    x="25"
-    y="25"
-    width="1350"
-    height="1350"
-    rx="38"
-    fill="none"
-    stroke="#202938"
-    stroke-width="2"
-  />
-
-  <!-- ========================== -->
-  <!-- العنوان -->
-  <!-- ========================== -->
-
-  <text
-    x="70"
-    y="90"
-    fill="#FFFFFF"
-    font-size="38"
-    font-weight="900"
-    font-family="Arial, sans-serif"
+    viewBox="0 0 ${WIDTH} ${HEIGHT}"
   >
-    NEON DNA
-  </text>
 
-  <text
-    x="70"
-    y="120"
-    fill="#727D90"
-    font-size="17"
-    font-weight="600"
-    font-family="Arial, sans-serif"
-  >
-    MEMBER IDENTITY CARD
-  </text>
+    <defs>
 
-  <rect
-    x="65"
-    y="130"
-    width="1270"
-    height="2"
-    fill="url(#line)"
-  />
+      <linearGradient
+        id="background"
+        x1="0"
+        y1="0"
+        x2="1"
+        y2="1"
+      >
+        <stop
+          offset="0%"
+          stop-color="#020202"
+        />
 
-  <!-- ========================== -->
-  <!-- PROFILE -->
-  <!-- ========================== -->
+        <stop
+          offset="55%"
+          stop-color="#110000"
+        />
 
-  <rect
-    x="65"
-    y="145"
-    width="1270"
-    height="255"
-    rx="28"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-    filter="url(#shadow)"
-  />
+        <stop
+          offset="100%"
+          stop-color="#020202"
+        />
+      </linearGradient>
 
-  <!-- إطار الأفاتار -->
+      <filter id="redGlow">
 
-  <circle
-    cx="195"
-    cy="280"
-    r="139"
-    fill="#090D14"
-    stroke="#5865F2"
-    stroke-width="4"
-  />
+        <feGaussianBlur
+          stdDeviation="5"
+          result="blur"
+        />
 
-  <circle
-    cx="195"
-    cy="280"
-    r="130"
-    fill="#111827"
-    stroke="#303A4D"
-    stroke-width="2"
-  />
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
 
-  ${
-    avatarBase64
-      ? `
+      </filter>
+
+      <radialGradient
+        id="avatarBorder"
+      >
+
+        <stop
+          offset="65%"
+          stop-color="#090909"
+        />
+
+        <stop
+          offset="75%"
+          stop-color="#ff1728"
+        />
+
+        <stop
+          offset="85%"
+          stop-color="#650009"
+        />
+
+        <stop
+          offset="100%"
+          stop-color="#100000"
+        />
+
+      </radialGradient>
+
+    </defs>
+
+    <!-- BACKGROUND -->
+
+    <rect
+      width="1400"
+      height="1400"
+      rx="45"
+      fill="url(#background)"
+    />
+
+    <!-- OUTER FRAME -->
+
+    <path
+      d="
+        M 30 140
+        L 90 105
+        H 1310
+        L 1370 140
+        V 1260
+        L 1310 1295
+        H 90
+        L 30 1260
+        Z
+      "
+      fill="none"
+      stroke="#690008"
+      stroke-width="8"
+    />
+
+    <path
+      d="
+        M 55 155
+        L 90 130
+        H 1310
+        L 1345 155
+      "
+      fill="none"
+      stroke="#ff1728"
+      stroke-width="3"
+      filter="url(#redGlow)"
+    />
+
+    <!-- HEADER -->
+
+    <text
+      x="78"
+      y="62"
+      font-family="Georgia, serif"
+      font-size="48"
+      font-weight="bold"
+      fill="#ff2837"
+    >
+      ♛ NEON
+    </text>
+
+    <text
+      x="80"
+      y="89"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="14"
+      letter-spacing="5"
+      fill="#999"
+    >
+      DISCORD SERVER
+    </text>
+
+    <text
+      x="1300"
+      y="53"
+      text-anchor="end"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="22"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      أكثر من مجرد سيرفر
+    </text>
+
+    <text
+      x="1300"
+      y="82"
+      text-anchor="end"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="15"
+      fill="#999"
+    >
+      نحن عائلة واحدة
+    </text>
+
+    <rect
+      x="70"
+      y="112"
+      width="1260"
+      height="3"
+      fill="#ff1728"
+      filter="url(#redGlow)"
+    />
+
+    <!-- ==================================================
+         TOP PROFILE
+         ================================================== -->
+
+    <rect
+      x="65"
+      y="145"
+      width="1270"
+      height="255"
+      fill="#030303"
+      stroke="#72000b"
+      stroke-width="1"
+    />
+
+    <!-- ================= AVATAR ================= -->
+
+    <!-- تم تصغير الأفاتار -->
+
+    <circle
+      cx="195"
+      cy="280"
+      r="112"
+      fill="url(#avatarBorder)"
+    />
+
+    <circle
+      cx="195"
+      cy="280"
+      r="104"
+      fill="#050505"
+      stroke="#ff1728"
+      stroke-width="3"
+    />
+
+    ${
+      avatar
+        ? `
+      <defs>
+        <clipPath id="avatarClip">
+          <circle
+            cx="195"
+            cy="280"
+            r="99"
+          />
+        </clipPath>
+      </defs>
+
       <image
-        href="${avatarBase64}"
-        x="71"
-        y="156"
-        width="248"
-        height="248"
+        href="${avatar}"
+        x="96"
+        y="181"
+        width="198"
+        height="198"
         preserveAspectRatio="xMidYMid slice"
         clip-path="url(#avatarClip)"
       />
       `
-      : `
+        : `
       <circle
         cx="195"
         cy="280"
-        r="124"
-        fill="#5865F2"
+        r="99"
+        fill="#111"
       />
 
       <text
         x="195"
-        y="300"
-        fill="#FFFFFF"
-        font-size="75"
-        font-weight="900"
+        y="295"
         text-anchor="middle"
-        font-family="Arial, sans-serif"
+        fill="#777"
+        font-size="27"
+        font-family="Arial, Tahoma, sans-serif"
       >
-        ${escapeXML(
-          (name || '?')
-            .charAt(0)
-            .toUpperCase()
-        )}
+        NEON
       </text>
       `
-  }
-
-  <!-- نقطة الحالة -->
-
-  <circle
-    cx="290"
-    cy="374"
-    r="23"
-    fill="#0B1018"
-    stroke="#202938"
-    stroke-width="3"
-  />
-
-  <circle
-    cx="290"
-    cy="374"
-    r="14"
-    fill="${status.color}"
-  />
-
-  <!-- الاسم -->
-
-  <text
-    x="355"
-    y="218"
-    fill="#FFFFFF"
-    font-size="31"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeName}
-  </text>
-
-  <!-- اليوزر -->
-
-  <text
-    x="357"
-    y="251"
-    fill="#8994A7"
-    font-size="18"
-    font-weight="600"
-    font-family="Arial, sans-serif"
-  >
-    @${safeUsername}
-  </text>
-
-  <!-- ========================== -->
-  <!-- رقم العضو -->
-  <!-- ========================== -->
-
-  <rect
-    x="355"
-    y="273"
-    width="360"
-    height="45"
-    rx="14"
-    fill="#111827"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="375"
-    y="302"
-    fill="#8B95A7"
-    font-size="18"
-    font-weight="700"
-    font-family="Arial, sans-serif"
-  >
-    رقم العضو
-  </text>
-
-  <text
-    x="690"
-    y="302"
-    fill="#FFFFFF"
-    font-size="19"
-    font-weight="900"
-    text-anchor="end"
-    font-family="Arial, sans-serif"
-  >
-    #${memberNumber}
-  </text>
-
-  <!-- ========================== -->
-  <!-- حالة العضو -->
-  <!-- ========================== -->
-
-  <rect
-    x="355"
-    y="328"
-    width="360"
-    height="45"
-    rx="14"
-    fill="#111827"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="375"
-    y="357"
-    fill="#8B95A7"
-    font-size="18"
-    font-weight="700"
-    font-family="Arial, sans-serif"
-  >
-    حالة العضو
-  </text>
-
-  <circle
-    cx="635"
-    cy="350"
-    r="9"
-    fill="${status.color}"
-  />
-
-  <text
-    x="660"
-    y="357"
-    fill="#FFFFFF"
-    font-size="18"
-    font-weight="800"
-    font-family="Arial, sans-serif"
-  >
-    ${safeStatus}
-  </text>
-
-  <!-- ========================== -->
-  <!-- ملف العضو -->
-  <!-- ========================== -->
-
-  <rect
-    x="790"
-    y="175"
-    width="505"
-    height="190"
-    rx="22"
-    fill="#0E141E"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="825"
-    y="220"
-    fill="#FFFFFF"
-    font-size="25"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ملف العضو
-  </text>
-
-  <text
-    x="825"
-    y="248"
-    fill="#778398"
-    font-size="15"
-    font-weight="600"
-    font-family="Arial, sans-serif"
-  >
-    بطاقة تعريف العضو
-  </text>
-
-  <rect
-    x="825"
-    y="267"
-    width="435"
-    height="2"
-    fill="#263244"
-  />
-
-  <text
-    x="825"
-    y="300"
-    fill="#8994A7"
-    font-size="15"
-    font-family="Arial, sans-serif"
-  >
-    ID
-  </text>
-
-  <text
-    x="1260"
-    y="300"
-    fill="#FFFFFF"
-    font-size="15"
-    font-weight="700"
-    text-anchor="end"
-    font-family="Arial, sans-serif"
-  >
-    ${safeID}
-  </text>
-
-  <text
-    x="825"
-    y="330"
-    fill="#8994A7"
-    font-size="15"
-    font-family="Arial, sans-serif"
-  >
-    بيانات وإحصائيات العضو
-  </text>
-
-  <!-- ========================== -->
-  <!-- الإحصائيات -->
-  <!-- ========================== -->
-
-  <text
-    x="70"
-    y="455"
-    fill="#FFFFFF"
-    font-size="26"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    إحصائيات العضو
-  </text>
-
-  <!-- BOX 1 -->
-
-  <rect
-    x="65"
-    y="480"
-    width="400"
-    height="145"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="95"
-    y="520"
-    fill="#7F8A9D"
-    font-size="17"
-    font-family="Arial, sans-serif"
-  >
-    الرسائل
-  </text>
-
-  <text
-    x="95"
-    y="570"
-    fill="#FFFFFF"
-    font-size="34"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${formatNumber(messages)}
-  </text>
-
-  <!-- BOX 2 -->
-
-  <rect
-    x="500"
-    y="480"
-    width="400"
-    height="145"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="530"
-    y="520"
-    fill="#7F8A9D"
-    font-size="17"
-    font-family="Arial, sans-serif"
-  >
-    الرتب
-  </text>
-
-  <text
-    x="530"
-    y="570"
-    fill="#FFFFFF"
-    font-size="34"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${formatNumber(roles)}
-  </text>
-
-  <!-- BOX 3 -->
-
-  <rect
-    x="935"
-    y="480"
-    width="400"
-    height="145"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="965"
-    y="520"
-    fill="#7F8A9D"
-    font-size="17"
-    font-family="Arial, sans-serif"
-  >
-    وقت الصوت
-  </text>
-
-  <text
-    x="965"
-    y="570"
-    fill="#FFFFFF"
-    font-size="24"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeVoice}
-  </text>
-
-  <!-- ========================== -->
-  <!-- بيانات الحساب -->
-  <!-- ========================== -->
-
-  <text
-    x="70"
-    y="680"
-    fill="#FFFFFF"
-    font-size="26"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    بيانات الحساب
-  </text>
-
-  <!-- حساب ديسكورد -->
-
-  <rect
-    x="65"
-    y="705"
-    width="620"
-    height="115"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="95"
-    y="745"
-    fill="#7F8A9D"
-    font-size="16"
-    font-family="Arial, sans-serif"
-  >
-    عمر حساب ديسكورد
-  </text>
-
-  <text
-    x="95"
-    y="785"
-    fill="#FFFFFF"
-    font-size="22"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeAccountAge}
-  </text>
-
-  <!-- تاريخ إنشاء الحساب -->
-
-  <rect
-    x="715"
-    y="705"
-    width="620"
-    height="115"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="745"
-    y="745"
-    fill="#7F8A9D"
-    font-size="16"
-    font-family="Arial, sans-serif"
-  >
-    تاريخ إنشاء الحساب
-  </text>
-
-  <text
-    x="745"
-    y="785"
-    fill="#FFFFFF"
-    font-size="22"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeAccountDate}
-  </text>
-
-  <!-- ========================== -->
-  <!-- السيرفر -->
-  <!-- ========================== -->
-
-  <text
-    x="70"
-    y="875"
-    fill="#FFFFFF"
-    font-size="26"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    بيانات السيرفر
-  </text>
-
-  <!-- الانضمام -->
-
-  <rect
-    x="65"
-    y="900"
-    width="400"
-    height="125"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="95"
-    y="940"
-    fill="#7F8A9D"
-    font-size="16"
-    font-family="Arial, sans-serif"
-  >
-    تاريخ دخول السيرفر
-  </text>
-
-  <text
-    x="95"
-    y="980"
-    fill="#FFFFFF"
-    font-size="21"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeJoinDate}
-  </text>
-
-  <!-- مدة العضوية -->
-
-  <rect
-    x="500"
-    y="900"
-    width="400"
-    height="125"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="530"
-    y="940"
-    fill="#7F8A9D"
-    font-size="16"
-    font-family="Arial, sans-serif"
-  >
-    مدة العضوية
-  </text>
-
-  <text
-    x="530"
-    y="980"
-    fill="#FFFFFF"
-    font-size="21"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeMembership}
-  </text>
-
-  <!-- رقم الديسكورد -->
-
-  <rect
-    x="935"
-    y="900"
-    width="400"
-    height="125"
-    rx="22"
-    fill="url(#card)"
-    stroke="#263244"
-    stroke-width="2"
-  />
-
-  <text
-    x="965"
-    y="940"
-    fill="#7F8A9D"
-    font-size="16"
-    font-family="Arial, sans-serif"
-  >
-    Discord ID
-  </text>
-
-  <text
-    x="965"
-    y="980"
-    fill="#FFFFFF"
-    font-size="18"
-    font-weight="900"
-    font-family="Arial, sans-serif"
-  >
-    ${safeID}
-  </text>
-
-  <!-- ========================== -->
-  <!-- الفوتر -->
-  <!-- ========================== -->
-
-  <rect
-    x="65"
-    y="1070"
-    width="1270"
-    height="2"
-    fill="url(#line)"
-  />
-
-  <text
-    x="700"
-    y="1120"
-    fill="#5865F2"
-    font-size="28"
-    font-weight="900"
-    text-anchor="middle"
-    font-family="Arial, sans-serif"
-  >
-    ELZRAZIR
-  </text>
-
-  <text
-    x="700"
-    y="1150"
-    fill="#697589"
-    font-size="15"
-    text-anchor="middle"
-    font-family="Arial, sans-serif"
-  >
-    NEON DNA • MEMBER CARD
-  </text>
-
-  <text
-    x="700"
-    y="1210"
-    fill="#3E485A"
-    font-size="13"
-    text-anchor="middle"
-    font-family="Arial, sans-serif"
-  >
-    ${safeID}
-  </text>
-
-</svg>
-`;
+    }
+
+    <!-- ================= STATUS DOT ================= -->
+
+    <circle
+      cx="274"
+      cy="357"
+      r="18"
+      fill="#050505"
+      stroke="#ff1728"
+      stroke-width="3"
+    />
+
+    <circle
+      cx="274"
+      cy="357"
+      r="10"
+      fill="${status.color}"
+    />
+
+    <!-- ================= NAME ================= -->
+
+    <text
+      x="335"
+      y="218"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="35"
+      font-weight="bold"
+      fill="#f5f5f5"
+    >
+      ${safeName}
+    </text>
+
+    <text
+      x="337"
+      y="251"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="18"
+      fill="#888"
+    >
+      @${safeUsername}
+    </text>
+
+    <!-- ================= MEMBER NUMBER ================= -->
+
+    <rect
+      x="335"
+      y="273"
+      width="380"
+      height="45"
+      rx="6"
+      fill="#080808"
+      stroke="#a90010"
+      stroke-width="2"
+    />
+
+    <text
+      x="360"
+      y="302"
+      direction="rtl"
+      text-anchor="start"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="17"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      رقم العضو
+    </text>
+
+    <text
+      x="690"
+      y="303"
+      text-anchor="end"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="20"
+      font-weight="bold"
+      fill="#ffffff"
+    >
+      #${formatNumber(memberNumber)}
+    </text>
+
+    <!-- ================= STATUS ================= -->
+
+    <rect
+      x="335"
+      y="328"
+      width="380"
+      height="45"
+      rx="6"
+      fill="#080808"
+      stroke="#a90010"
+      stroke-width="2"
+    />
+
+    <text
+      x="360"
+      y="357"
+      direction="rtl"
+      text-anchor="start"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="17"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      حالة العضو
+    </text>
+
+    <!-- نقطة الحالة داخل خانة الحالة -->
+
+    <circle
+      cx="610"
+      cy="350"
+      r="7"
+      fill="${status.color}"
+    />
+
+    <text
+      x="635"
+      y="357"
+      text-anchor="middle"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="18"
+      font-weight="bold"
+      fill="${status.color}"
+    >
+      ${escapeXML(status.text)}
+    </text>
+
+    <!-- ================= PROFILE BOX ================= -->
+
+    <path
+      d="
+        M 790 175
+        H 1260
+        L 1295 210
+        V 365
+        L 1260 400
+        H 790
+        L 755 365
+        V 210
+        Z
+      "
+      fill="#050505"
+      stroke="#ff2635"
+      stroke-width="2.5"
+    />
+
+    <text
+      x="1025"
+      y="235"
+      text-anchor="middle"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="31"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      ملف العضو
+    </text>
+
+    <text
+      x="1025"
+      y="272"
+      text-anchor="middle"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="17"
+      fill="#ddd"
+    >
+      بطاقة تعريف العضو
+    </text>
+
+    <rect
+      x="850"
+      y="294"
+      width="350"
+      height="2"
+      fill="#ff2635"
+    />
+
+    <text
+      x="1025"
+      y="337"
+      text-anchor="middle"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="15"
+      fill="#777"
+    >
+      بيانات وإحصائيات العضو
+    </text>
+
+    <!-- ==================================================
+         MAIN STATS
+         ================================================== -->
+
+    ${bigBox(
+      65,
+      425,
+      395,
+      'مدة العضوية',
+      'مدة وجود العضو داخل السيرفر',
+      membership
+    )}
+
+    ${bigBox(
+      500,
+      425,
+      395,
+      'عدد الرسائل',
+      'إجمالي رسائل العضو',
+      `${formatNumber(messages)} رسالة`
+    )}
+
+    ${bigBox(
+      935,
+      425,
+      395,
+      'وقت المكالمات',
+      'إجمالي وقت وجود العضو في الفويس',
+      voice
+    )}
+
+    <!-- ==================================================
+         SECOND ROW
+         ================================================== -->
+
+    ${smallBox(
+      65,
+      645,
+      290,
+      'حالة العضو',
+      status.text
+    )}
+
+    ${smallBox(
+      375,
+      645,
+      290,
+      'ترتيب العضو',
+      `#${formatNumber(memberNumber)}`
+    )}
+
+    ${smallBox(
+      685,
+      645,
+      290,
+      'عدد الرتب',
+      `${formatNumber(roles)} رتبة`
+    )}
+
+    ${smallBox(
+      995,
+      645,
+      335,
+      'عمر الحساب',
+      accountAge
+    )}
+
+    <!-- ==================================================
+         THIRD ROW
+         ================================================== -->
+
+    ${smallBox(
+      65,
+      825,
+      400,
+      'اسم العضو',
+      name
+    )}
+
+    ${smallBox(
+      500,
+      825,
+      400,
+      'تاريخ الانضمام',
+      joinDate
+    )}
+
+    ${smallBox(
+      935,
+      825,
+      395,
+      'تاريخ إنشاء الحساب',
+      accountDate
+    )}
+
+    <!-- ==================================================
+         BOTTOM
+         ================================================== -->
+
+    ${smallBox(
+      65,
+      1005,
+      600,
+      'معرّف العضو',
+      safeID
+    )}
+
+    ${smallBox(
+      700,
+      1005,
+      630,
+      'اسم المستخدم',
+      safeUsername
+    )}
+
+    <!-- ==================================================
+         FOOTER
+         ================================================== -->
+
+    <rect
+      x="65"
+      y="1205"
+      width="1270"
+      height="2"
+      fill="#690009"
+    />
+
+    <text
+      x="700"
+      y="1250"
+      text-anchor="middle"
+      font-family="Georgia, serif"
+      font-size="38"
+      font-weight="bold"
+      fill="#ff2635"
+    >
+      ♛ NEON
+    </text>
+
+    <text
+      x="700"
+      y="1278"
+      text-anchor="middle"
+      direction="rtl"
+      font-family="Arial, Tahoma, sans-serif"
+      font-size="14"
+      fill="#777"
+    >
+      بطاقة العضو • الإحصائيات • البيانات
+    </text>
+
+  </svg>
+  `;
 
   return sharp(
     Buffer.from(svg)
@@ -1266,9 +1252,9 @@ async function createDNAImage(
     .toBuffer();
 }
 
-// ==============================
-// أمر DNA
-// ==============================
+// ======================================================
+// SLASH COMMAND
+// ======================================================
 
 const commands = [
   new SlashCommandBuilder()
@@ -1276,80 +1262,97 @@ const commands = [
     .setDescription(
       'عرض بطاقة NEON DNA وإحصائيات العضو'
     )
-].map(command => command.toJSON());
+].map(
+  command => command.toJSON()
+);
 
-// ==============================
-// تسجيل الأمر
-// ==============================
-
-const rest = new REST({
-  version: '10'
-}).setToken(TOKEN);
+const rest =
+  new REST({
+    version: '10'
+  }).setToken(TOKEN);
 
 async function registerCommands() {
   try {
-    console.log('⏳ تسجيل أوامر البوت...');
+    console.log(
+      '🔄 جاري تسجيل /dna...'
+    );
 
     await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
+      Routes.applicationCommands(
+        CLIENT_ID
+      ),
       {
         body: commands
       }
     );
 
-    console.log('✅ تم تسجيل أمر /dna');
+    console.log(
+      '✅ تم تسجيل /dna.'
+    );
+
   } catch (error) {
     console.error(
-      '❌ خطأ في تسجيل الأوامر:',
+      '❌ خطأ في تسجيل الأمر:',
       error
     );
   }
 }
 
-// ==============================
-// تشغيل البوت
-// ==============================
+// ======================================================
+// READY
+// ======================================================
 
-client.once('ready', async () => {
-  console.log(
-    `✅ البوت يعمل باسم: ${client.user.tag}`
-  );
+client.once(
+  'ready',
+  async () => {
 
-  console.log(
-    `📌 قناة DNA: ${DNA_CHANNEL_ID}`
-  );
+    console.log(
+      `✅ البوت يعمل باسم: ${client.user.tag}`
+    );
 
-  await registerCommands();
+    console.log(
+      `📌 قناة DNA: ${DNA_CHANNEL_ID}`
+    );
 
-  // تحديث حالة الفويس
-  for (const guild of client.guilds.cache.values()) {
-    for (const member of guild.members.cache.values()) {
+    await registerCommands();
 
-      if (member.user.bot) {
-        continue;
-      }
+    for (
+      const guild
+      of client.guilds.cache.values()
+    ) {
 
-      const memberData =
-        getMemberData(
-          guild.id,
-          member.id
-        );
+      for (
+        const member
+        of guild.members.cache.values()
+      ) {
 
-      if (member.voice?.channelId) {
-        memberData.voiceStarted =
-          Date.now();
-      } else {
-        memberData.voiceStarted = null;
+        if (member.user.bot) {
+          continue;
+        }
+
+        const memberData =
+          getMemberData(
+            guild.id,
+            member.id
+          );
+
+        if (member.voice?.channelId) {
+          memberData.voiceStarted =
+            Date.now();
+        } else {
+          memberData.voiceStarted =
+            null;
+        }
       }
     }
+
+    saveNow();
   }
+);
 
-  saveNow();
-});
-
-// ==============================
-// الرسائل
-// ==============================
+// ======================================================
+// MESSAGE COUNTER
+// ======================================================
 
 client.on(
   'messageCreate',
@@ -1374,9 +1377,9 @@ client.on(
   }
 );
 
-// ==============================
-// الفويس
-// ==============================
+// ======================================================
+// VOICE COUNTER
+// ======================================================
 
 client.on(
   'voiceStateUpdate',
@@ -1386,89 +1389,105 @@ client.on(
       return;
     }
 
-    const member =
-      newState.member ||
-      oldState.member;
-
-    if (!member || member.user.bot) {
+    if (
+      newState.member?.user?.bot
+    ) {
       return;
     }
 
     const memberData =
       getMemberData(
         newState.guild.id,
-        member.id
+        newState.id
       );
 
-    // دخل فويس
+    // دخل الفويس
+
     if (
       !oldState.channelId &&
       newState.channelId
     ) {
+
       memberData.voiceStarted =
         Date.now();
 
       saveSoon();
-
       return;
     }
 
     // خرج من الفويس
+
     if (
       oldState.channelId &&
       !newState.channelId
     ) {
-      if (memberData.voiceStarted) {
 
-        const seconds = Math.floor(
-          (
-            Date.now() -
-            Number(memberData.voiceStarted)
-          ) / 1000
-        );
+      if (
+        memberData.voiceStarted
+      ) {
 
         memberData.voiceSeconds +=
-          Math.max(0, seconds);
+          Math.max(
+            0,
+            Math.floor(
+              (
+                Date.now() -
+                Number(
+                  memberData.voiceStarted
+                )
+              ) / 1000
+            )
+          );
       }
 
-      memberData.voiceStarted = null;
+      memberData.voiceStarted =
+        null;
 
       saveSoon();
-
       return;
     }
 
-    // نقل من روم لروم
+    // نقل من روم إلى روم
+
     if (
       oldState.channelId &&
       newState.channelId &&
-      oldState.channelId !== newState.channelId
+      oldState.channelId !==
+        newState.channelId
     ) {
-      memberData.voiceStarted =
-        Date.now();
+
+      if (
+        !memberData.voiceStarted
+      ) {
+        memberData.voiceStarted =
+          Date.now();
+      }
 
       saveSoon();
     }
   }
 );
 
-// ==============================
-// التفاعل مع /dna
-// ==============================
+// ======================================================
+// /DNA
+// ======================================================
 
 client.on(
   'interactionCreate',
   async interaction => {
 
-    if (!interaction.isChatInputCommand()) {
+    if (
+      !interaction.isChatInputCommand()
+    ) {
       return;
     }
 
-    if (interaction.commandName !== 'dna') {
+    if (
+      interaction.commandName !== 'dna'
+    ) {
       return;
     }
 
-    // السماح بالأمر في قناة DNA فقط
     if (
       interaction.channelId !==
       DNA_CHANNEL_ID
@@ -1477,7 +1496,8 @@ client.on(
       return interaction.reply({
         content:
           `❌ استخدم الأمر داخل قناة بطاقات الأعضاء فقط: <#${DNA_CHANNEL_ID}>`,
-        flags: MessageFlags.Ephemeral
+        flags:
+          MessageFlags.Ephemeral
       });
     }
 
@@ -1486,25 +1506,23 @@ client.on(
       await interaction.deferReply();
 
       const member =
-        await interaction.guild.members.fetch(
-          interaction.user.id
-        );
+        await interaction.guild.members.fetch({
+          user: interaction.user.id,
+          force: true
+        });
 
-      // بيانات العضو
       const memberData =
         getMemberData(
           interaction.guild.id,
           member.id
         );
 
-      // رقم العضو تلقائي وثابت
       const memberNumber =
-        assignMemberNumber(
-          interaction.guild.id,
-          member.id
+        await getMemberNumber(
+          interaction.guild,
+          member
         );
 
-      // إنشاء الصورة
       const image =
         await createDNAImage(
           member,
@@ -1533,20 +1551,18 @@ client.on(
       );
 
       try {
-
         await interaction.editReply({
           content:
             '❌ حدث خطأ أثناء إنشاء بطاقة العضو.'
         });
-
       } catch {}
     }
   }
 );
 
-// ==============================
-// حفظ عند إغلاق البوت
-// ==============================
+// ======================================================
+// SAFE SHUTDOWN
+// ======================================================
 
 process.on(
   'SIGINT',
@@ -1585,13 +1601,11 @@ process.on(
       '❌ unhandledRejection:',
       error
     );
-
-    saveNow();
   }
 );
 
-// ==============================
-// تسجيل الدخول
-// ==============================
+// ======================================================
+// LOGIN
+// ======================================================
 
 client.login(TOKEN);
