@@ -11,21 +11,21 @@ const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
 
-/* =========================================
-   CONFIG
-========================================= */
+/* =====================================================
+   إعدادات البوت
+===================================================== */
 
 const CLIENT_ID = "1557370938650271824";
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
-  console.error("❌ DISCORD_TOKEN غير موجود في Environment Variables");
+  console.error("❌ توكن البوت غير موجود في إعدادات الاستضافة.");
   process.exit(1);
 }
 
-/* =========================================
-   DISCORD CLIENT
-========================================= */
+/* =====================================================
+   تشغيل البوت
+===================================================== */
 
 const client = new Client({
   intents: [
@@ -33,13 +33,14 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildPresences
   ]
 });
 
-/* =========================================
-   DATA FILE
-========================================= */
+/* =====================================================
+   ملف البيانات
+===================================================== */
 
 const DATA_FILE = path.join(__dirname, "data.json");
 
@@ -51,14 +52,14 @@ if (fs.existsSync(DATA_FILE)) {
       fs.readFileSync(DATA_FILE, "utf8")
     );
   } catch (error) {
-    console.error("⚠️ مشكلة في قراءة data.json");
+    console.error("⚠️ تعذر قراءة ملف البيانات.");
     data = {};
   }
 }
 
-/* =========================================
-   SAVE DATA
-========================================= */
+/* =====================================================
+   حفظ البيانات
+===================================================== */
 
 function saveData() {
   try {
@@ -69,15 +70,15 @@ function saveData() {
     );
   } catch (error) {
     console.error(
-      "❌ خطأ أثناء حفظ البيانات:",
+      "❌ حدث خطأ أثناء حفظ البيانات:",
       error
     );
   }
 }
 
-/* =========================================
-   MEMBER DATA
-========================================= */
+/* =====================================================
+   بيانات العضو
+===================================================== */
 
 function getMemberData(guildId, userId) {
   if (!data[guildId]) {
@@ -95,11 +96,42 @@ function getMemberData(guildId, userId) {
   return data[guildId][userId];
 }
 
-/* =========================================
-   FORMAT VOICE TIME
-========================================= */
+/* =====================================================
+   حساب مدة العضوية
+===================================================== */
 
-function formatDuration(seconds) {
+function getMembershipParts(date) {
+  if (!date) {
+    return {
+      days: 0,
+      hours: 0
+    };
+  }
+
+  const difference = Math.max(
+    0,
+    Date.now() - date.getTime()
+  );
+
+  const days = Math.floor(
+    difference / 86400000
+  );
+
+  const hours = Math.floor(
+    (difference % 86400000) / 3600000
+  );
+
+  return {
+    days,
+    hours
+  };
+}
+
+/* =====================================================
+   تنسيق وقت المكالمات
+===================================================== */
+
+function formatVoiceTime(seconds) {
   seconds = Math.max(
     0,
     Math.floor(seconds)
@@ -121,60 +153,119 @@ function formatDuration(seconds) {
     seconds / 60
   );
 
-  const parts = [];
-
-  if (days) {
-    parts.push(`${days} يوم`);
+  if (days > 0) {
+    return `${days} يوم - ${hours} ساعة`;
   }
 
-  if (hours) {
-    parts.push(`${hours} ساعة`);
+  if (hours > 0) {
+    return `${hours} ساعة - ${minutes} دقيقة`;
   }
 
-  if (
-    minutes ||
-    parts.length === 0
-  ) {
-    parts.push(`${minutes} دقيقة`);
-  }
-
-  return parts.join(" و ");
+  return `${minutes} دقيقة`;
 }
 
-/* =========================================
-   FORMAT MEMBERSHIP
-========================================= */
+/* =====================================================
+   عمر حساب ديسكورد
+===================================================== */
 
-function formatMembership(date) {
+function getAccountAge(date) {
   if (!date) {
-    return "غير معروف";
+    return {
+      value: 0,
+      unit: "يوم"
+    };
   }
 
-  const diff = Math.max(
+  const difference = Math.max(
     0,
     Date.now() - date.getTime()
   );
 
   const days = Math.floor(
-    diff / 86400000
+    difference / 86400000
   );
 
-  const hours = Math.floor(
-    (diff % 86400000) / 3600000
+  const years = Math.floor(
+    days / 365
   );
 
-  if (days > 0) {
-    return `${days} يوم${
-      hours ? ` و ${hours} ساعة` : ""
-    }`;
+  const months = Math.floor(
+    (days % 365) / 30
+  );
+
+  if (years > 0) {
+    return {
+      value: years,
+      unit: years === 1 ? "سنة" : "سنوات"
+    };
   }
 
-  return `${hours} ساعة`;
+  if (months > 0) {
+    return {
+      value: months,
+      unit: months === 1 ? "شهر" : "شهور"
+    };
+  }
+
+  return {
+    value: days,
+    unit: "يوم"
+  };
 }
 
-/* =========================================
-   ESCAPE SVG TEXT
-========================================= */
+/* =====================================================
+   رقم العضو في السيرفر
+===================================================== */
+
+async function getMemberNumber(
+  guild,
+  targetMember
+) {
+  try {
+    const members =
+      await guild.members.fetch();
+
+    const humanMembers =
+      members
+        .filter(member => !member.user.bot)
+        .sort((a, b) => {
+          const first =
+            a.joinedTimestamp || Infinity;
+
+          const second =
+            b.joinedTimestamp || Infinity;
+
+          return first - second;
+        });
+
+    const list =
+      [...humanMembers.values()];
+
+    const index =
+      list.findIndex(
+        member =>
+          member.id === targetMember.id
+      );
+
+    if (index === -1) {
+      return list.length;
+    }
+
+    return index + 1;
+
+  } catch (error) {
+    console.error(
+      "⚠️ تعذر حساب رقم العضو:",
+      error
+    );
+
+    return 1;
+  }
+}
+
+/* =====================================================
+   حماية النص
+===================================================== */
 
 function escapeXML(text) {
   return String(text)
@@ -185,20 +276,56 @@ function escapeXML(text) {
     .replace(/'/g, "&apos;");
 }
 
-/* =========================================
-   CREATE DNA IMAGE
-========================================= */
+/* =====================================================
+   حالة العضو
+===================================================== */
+
+function getMemberStatus(member) {
+  const status =
+    member.presence?.status;
+
+  if (status === "online") {
+    return {
+      text: "متصل",
+      color: "#35e06f"
+    };
+  }
+
+  if (status === "idle") {
+    return {
+      text: "خامل",
+      color: "#f0b429"
+    };
+  }
+
+  if (status === "dnd") {
+    return {
+      text: "مشغول",
+      color: "#ff4141"
+    };
+  }
+
+  return {
+    text: "غير متصل",
+    color: "#777777"
+  };
+}
+
+/* =====================================================
+   إنشاء صورة DNA
+===================================================== */
 
 async function createDNAImage(
   member,
-  memberData
+  memberData,
+  memberNumber
 ) {
   const width = 1000;
-  const height = 560;
+  const height = 600;
 
-  /* -----------------------------------------
-     AVATAR
-  ----------------------------------------- */
+  /* ---------------------------------------------
+     صورة العضو
+  --------------------------------------------- */
 
   const avatarURL =
     member.user.displayAvatarURL({
@@ -217,9 +344,7 @@ async function createDNAImage(
         await response.arrayBuffer();
     }
   } catch (error) {
-    console.error(
-      "⚠️ فشل تحميل صورة العضو"
-    );
+    avatarBuffer = null;
   }
 
   const avatarBase64 =
@@ -229,11 +354,26 @@ async function createDNAImage(
         ).toString("base64")
       : "";
 
-  /* -----------------------------------------
-     VOICE
-  ----------------------------------------- */
+  /* ---------------------------------------------
+     مدة العضوية
+  --------------------------------------------- */
 
-  const currentVoiceSeconds =
+  const membership =
+    getMembershipParts(
+      member.joinedAt
+    );
+
+  const days =
+    membership.days;
+
+  const hours =
+    membership.hours;
+
+  /* ---------------------------------------------
+     وقت المكالمات
+  --------------------------------------------- */
+
+  const voiceSeconds =
     memberData.voiceSeconds +
     (
       memberData.voiceStarted
@@ -246,35 +386,58 @@ async function createDNAImage(
         : 0
     );
 
-  /* -----------------------------------------
-     DATA
-  ----------------------------------------- */
+  const voiceTime =
+    formatVoiceTime(
+      voiceSeconds
+    );
+
+  /* ---------------------------------------------
+     الرسائل
+  --------------------------------------------- */
 
   const messages =
     memberData.messages.toLocaleString(
       "en-US"
     );
 
-  const voiceTime =
-    formatDuration(
-      currentVoiceSeconds
-    );
-
-  const joined =
-    member.joinedAt
-      ? formatMembership(
-          member.joinedAt
-        )
-      : "غير معروف";
+  /* ---------------------------------------------
+     اسم العضو
+  --------------------------------------------- */
 
   const username =
     escapeXML(
       member.user.username
     );
 
-  /* -----------------------------------------
-     AVATAR SVG
-  ----------------------------------------- */
+  /* ---------------------------------------------
+     عمر الحساب
+  --------------------------------------------- */
+
+  const account =
+    getAccountAge(
+      member.user.createdAt
+    );
+
+  /* ---------------------------------------------
+     عدد الرتب
+  --------------------------------------------- */
+
+  const roleCount =
+    Math.max(
+      0,
+      member.roles.cache.size - 1
+    );
+
+  /* ---------------------------------------------
+     الحالة
+  --------------------------------------------- */
+
+  const status =
+    getMemberStatus(member);
+
+  /* ---------------------------------------------
+     صورة العضو داخل الدائرة
+  --------------------------------------------- */
 
   const avatarCircle =
     avatarBase64
@@ -301,21 +464,22 @@ async function createDNAImage(
       `
       : "";
 
-  /* =========================================
-     SVG
-  ========================================= */
+  /* =================================================
+     تصميم الصورة
+  ================================================= */
 
   const svg = `
   <svg
     width="${width}"
     height="${height}"
-    viewBox="0 0 1000 560"
+    viewBox="0 0 1000 600"
     xmlns="http://www.w3.org/2000/svg"
   >
 
     <defs>
 
-      <!-- Background -->
+      <!-- الخلفية -->
+
       <linearGradient
         id="background"
         x1="0"
@@ -325,12 +489,12 @@ async function createDNAImage(
       >
         <stop
           offset="0%"
-          stop-color="#030303"
+          stop-color="#020202"
         />
 
         <stop
           offset="50%"
-          stop-color="#100303"
+          stop-color="#100202"
         />
 
         <stop
@@ -339,7 +503,8 @@ async function createDNAImage(
         />
       </linearGradient>
 
-      <!-- Red Line -->
+      <!-- الخط الأحمر -->
+
       <linearGradient
         id="redLine"
         x1="0"
@@ -349,7 +514,7 @@ async function createDNAImage(
       >
         <stop
           offset="0%"
-          stop-color="#650000"
+          stop-color="#550000"
         />
 
         <stop
@@ -359,11 +524,12 @@ async function createDNAImage(
 
         <stop
           offset="100%"
-          stop-color="#650000"
+          stop-color="#550000"
         />
       </linearGradient>
 
-      <!-- Glow -->
+      <!-- توهج -->
+
       <filter id="redGlow">
         <feGaussianBlur
           stdDeviation="7"
@@ -376,100 +542,97 @@ async function createDNAImage(
         </feMerge>
       </filter>
 
-      <!-- Shadow -->
+      <!-- ظل -->
+
       <filter id="shadow">
         <feDropShadow
           dx="0"
-          dy="6"
-          stdDeviation="8"
+          dy="5"
+          stdDeviation="7"
           flood-color="#000000"
-          flood-opacity="0.65"
+          flood-opacity="0.7"
         />
       </filter>
 
     </defs>
 
-    <!-- =====================================
-         BACKGROUND
-    ====================================== -->
+    <!-- =================================================
+         الخلفية
+    ================================================= -->
 
     <rect
       width="1000"
-      height="560"
-      rx="38"
+      height="600"
+      rx="40"
       fill="url(#background)"
     />
 
     <circle
       cx="900"
-      cy="70"
-      r="180"
-      fill="#9b0000"
+      cy="80"
+      r="190"
+      fill="#a00000"
       opacity="0.08"
     />
 
     <circle
-      cx="40"
-      cy="500"
-      r="190"
+      cx="30"
+      cy="540"
+      r="200"
       fill="#ff0000"
-      opacity="0.045"
+      opacity="0.035"
     />
 
-    <!-- =====================================
-         MAIN BORDER
-    ====================================== -->
+    <!-- الإطار -->
 
     <rect
       x="24"
       y="24"
       width="952"
-      height="512"
-      rx="30"
+      height="552"
+      rx="32"
       fill="none"
-      stroke="#760000"
+      stroke="#720000"
       stroke-width="2"
     />
 
-    <!-- =====================================
-         HEADER
-    ====================================== -->
+    <!-- =================================================
+         العنوان
+    ================================================= -->
 
     <text
       x="500"
-      y="63"
+      y="62"
       text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
-      font-size="31"
+      font-size="30"
       font-weight="bold"
-      letter-spacing="2"
     >
-      NEON • DNA
+      نيون • تعريف العضو
     </text>
 
     <text
       x="500"
-      y="91"
+      y="89"
       text-anchor="middle"
       fill="#666666"
       font-family="Arial"
       font-size="14"
-      letter-spacing="3"
     >
-      MEMBER PROFILE
+      ملف معلومات العضو
     </text>
 
-    <!-- =====================================
-         AVATAR
-    ====================================== -->
+    <!-- =================================================
+         الصورة
+    ================================================= -->
 
     <circle
       cx="135"
       cy="135"
       r="96"
-      fill="#090000"
-      stroke="#4d0000"
+      fill="#080000"
+      stroke="#430000"
       stroke-width="2"
     />
 
@@ -485,16 +648,16 @@ async function createDNAImage(
 
     ${avatarCircle}
 
-    <!-- =====================================
-         USERNAME
-    ====================================== -->
+    <!-- =================================================
+         اسم العضو
+    ================================================= -->
 
     <text
       x="270"
-      y="125"
+      y="120"
       fill="#ffffff"
       font-family="Arial"
-      font-size="32"
+      font-size="31"
       font-weight="bold"
     >
       ${username}
@@ -502,34 +665,79 @@ async function createDNAImage(
 
     <text
       x="270"
-      y="153"
-      fill="#666666"
+      y="148"
+      fill="#777777"
       font-family="Arial"
-      font-size="16"
+      font-size="15"
     >
-      @${username}
+      اسم العضو
     </text>
 
-    <rect
+    <!-- رقم العضو -->
+
+    <text
       x="270"
-      y="174"
-      width="210"
-      height="3"
-      rx="2"
+      y="176"
       fill="#ff2020"
+      font-family="Arial"
+      font-size="17"
+      font-weight="bold"
+    >
+      رقم العضو
+    </text>
+
+    <text
+      x="370"
+      y="176"
+      fill="#ffffff"
+      font-family="Arial"
+      font-size="17"
+      font-weight="bold"
+    >
+      ${memberNumber}
+    </text>
+
+    <!-- الحالة -->
+
+    <circle
+      cx="275"
+      cy="201"
+      r="6"
+      fill="${status.color}"
     />
 
-    <!-- =====================================
-         CARD 1
-    ====================================== -->
+    <text
+      x="290"
+      y="206"
+      fill="#888888"
+      font-family="Arial"
+      font-size="14"
+    >
+      الحالة
+    </text>
+
+    <text
+      x="350"
+      y="206"
+      fill="${status.color}"
+      font-family="Arial"
+      font-size="14"
+      font-weight="bold"
+    >
+      ${status.text}
+    </text>
+
+    <!-- =================================================
+         الكارت الأول
+    ================================================= -->
 
     <rect
       x="50"
-      y="225"
+      y="230"
       width="285"
-      height="145"
+      height="155"
       rx="22"
-      fill="#0a0a0a"
+      fill="#090909"
       stroke="#3d0909"
       stroke-width="1.5"
       filter="url(#shadow)"
@@ -537,48 +745,82 @@ async function createDNAImage(
 
     <text
       x="75"
-      y="258"
+      y="262"
       fill="#ff2020"
       font-family="Arial"
-      font-size="17"
+      font-size="18"
       font-weight="bold"
-      letter-spacing="1"
     >
-      MEMBER TIME
+      مدة العضوية
     </text>
 
     <text
       x="75"
-      y="286"
-      fill="#888888"
+      y="290"
+      fill="#777777"
       font-family="Arial"
-      font-size="15"
+      font-size="14"
     >
       داخل السيرفر منذ
     </text>
 
+    <!-- الأيام -->
+
     <text
       x="75"
-      y="326"
+      y="327"
       fill="#ffffff"
       font-family="Arial"
-      font-size="23"
+      font-size="25"
       font-weight="bold"
     >
-      ${joined}
+      ${days}
     </text>
 
-    <!-- =====================================
-         CARD 2
-    ====================================== -->
+    <text
+      x="125"
+      y="327"
+      fill="#aaaaaa"
+      font-family="Arial"
+      font-size="20"
+    >
+      يوم
+    </text>
+
+    <!-- الساعات -->
+
+    <text
+      x="75"
+      y="356"
+      fill="#ffffff"
+      font-family="Arial"
+      font-size="22"
+      font-weight="bold"
+    >
+      ${hours}
+    </text>
+
+    <text
+      x="120"
+      y="356"
+      fill="#aaaaaa"
+      font-family="Arial"
+      font-size="18"
+    >
+      ساعة
+    </text>
+
+    <!-- =================================================
+         الكارت الثاني
+    ================================================= -->
 
     <rect
       x="357"
-      y="225"
+      y="230"
       width="285"
-      height="145"
+      height="155"
       rx="22"
-      fill="#0a0a0a"
+      fill="#090909"
       stroke="#3d0909"
       stroke-width="1.5"
       filter="url(#shadow)"
@@ -586,48 +828,57 @@ async function createDNAImage(
 
     <text
       x="382"
-      y="258"
+      y="262"
       fill="#ff2020"
       font-family="Arial"
-      font-size="17"
+      font-size="18"
       font-weight="bold"
-      letter-spacing="1"
     >
-      MESSAGES
+      عدد الرسائل
     </text>
 
     <text
       x="382"
-      y="286"
-      fill="#888888"
+      y="290"
+      fill="#777777"
       font-family="Arial"
-      font-size="15"
+      font-size="14"
     >
-      إجمالي الرسائل
+      إجمالي رسائل العضو
     </text>
 
     <text
       x="382"
-      y="326"
+      y="337"
       fill="#ffffff"
       font-family="Arial"
-      font-size="27"
+      font-size="30"
       font-weight="bold"
     >
       ${messages}
     </text>
 
-    <!-- =====================================
-         CARD 3
-    ====================================== -->
+    <text
+      x="382"
+      y="365"
+      fill="#777777"
+      font-family="Arial"
+      font-size="13"
+    >
+      رسالة
+    </text>
+
+    <!-- =================================================
+         الكارت الثالث
+    ================================================= -->
 
     <rect
       x="665"
-      y="225"
+      y="230"
       width="285"
-      height="145"
+      height="155"
       rx="22"
-      fill="#0a0a0a"
+      fill="#090909"
       stroke="#3d0909"
       stroke-width="1.5"
       filter="url(#shadow)"
@@ -635,77 +886,161 @@ async function createDNAImage(
 
     <text
       x="690"
-      y="258"
+      y="262"
       fill="#ff2020"
       font-family="Arial"
-      font-size="17"
+      font-size="18"
       font-weight="bold"
-      letter-spacing="1"
-    >
-      VOICE TIME
-    </text>
-
-    <text
-      x="690"
-      y="286"
-      fill="#888888"
-      font-family="Arial"
-      font-size="15"
     >
       وقت المكالمات
     </text>
 
     <text
       x="690"
-      y="326"
+      y="290"
+      fill="#777777"
+      font-family="Arial"
+      font-size="14"
+    >
+      إجمالي وقت المكالمات
+    </text>
+
+    <text
+      x="690"
+      y="337"
       fill="#ffffff"
       font-family="Arial"
-      font-size="22"
+      font-size="23"
       font-weight="bold"
     >
       ${voiceTime}
     </text>
 
-    <!-- =====================================
-         DIVIDER
-    ====================================== -->
+    <!-- =================================================
+         الخط الفاصل
+    ================================================= -->
 
     <rect
       x="50"
-      y="400"
+      y="410"
       width="900"
       height="3"
       rx="2"
       fill="url(#redLine)"
     />
 
-    <!-- =====================================
-         FOOTER
-    ====================================== -->
+    <!-- =================================================
+         المعلومات الإضافية
+    ================================================= -->
+
+    <!-- عمر الحساب -->
+
+    <text
+      x="75"
+      y="448"
+      fill="#777777"
+      font-family="Arial"
+      font-size="13"
+    >
+      عمر الحساب
+    </text>
+
+    <text
+      x="75"
+      y="475"
+      fill="#ffffff"
+      font-family="Arial"
+      font-size="17"
+      font-weight="bold"
+    >
+      ${account.value}
+    </text>
+
+    <text
+      x="125"
+      y="475"
+      fill="#aaaaaa"
+      font-family="Arial"
+      font-size="15"
+    >
+      ${account.unit}
+    </text>
+
+    <!-- عدد الرتب -->
 
     <text
       x="500"
-      y="450"
+      y="448"
+      text-anchor="middle"
+      fill="#777777"
+      font-family="Arial"
+      font-size="13"
+    >
+      عدد الرتب
+    </text>
+
+    <text
+      x="500"
+      y="475"
+      text-anchor="middle"
+      fill="#ffffff"
+      font-family="Arial"
+      font-size="18"
+      font-weight="bold"
+    >
+      ${roleCount}
+    </text>
+
+    <!-- رقم العضو -->
+
+    <text
+      x="925"
+      y="448"
+      text-anchor="end"
+      fill="#777777"
+      font-family="Arial"
+      font-size="13"
+    >
+      ترتيب العضو
+    </text>
+
+    <text
+      x="925"
+      y="475"
+      text-anchor="end"
+      fill="#ff2020"
+      font-family="Arial"
+      font-size="18"
+      font-weight="bold"
+    >
+      رقم ${memberNumber}
+    </text>
+
+    <!-- =================================================
+         أسفل الصورة
+    ================================================= -->
+
+    <text
+      x="500"
+      y="525"
       text-anchor="middle"
       fill="#ff2020"
       font-family="Arial"
       font-size="19"
       font-weight="bold"
-      letter-spacing="2"
     >
-      NEON • GANG
+      عصابة نيون
     </text>
 
     <text
       x="500"
-      y="478"
+      y="550"
       text-anchor="middle"
       fill="#555555"
       font-family="Arial"
-      font-size="13"
-      letter-spacing="2"
+      font-size="12"
     >
-      DNA MEMBER SYSTEM
+      نظام تعريف أعضاء السيرفر
     </text>
 
   </svg>
@@ -718,21 +1053,21 @@ async function createDNAImage(
     .toBuffer();
 }
 
-/* =========================================
-   SLASH COMMAND
-========================================= */
+/* =====================================================
+   أمر /dna
+===================================================== */
 
 const commands = [
   new SlashCommandBuilder()
     .setName("dna")
     .setDescription(
-      "🧬 عرض تعريف العضو وإحصائياته"
+      "عرض بطاقة تعريف العضو وإحصائياته"
     )
     .addUserOption(option =>
       option
         .setName("member")
         .setDescription(
-          "العضو الذي تريد عرض بياناته"
+          "اختر العضو الذي تريد عرض بطاقته"
         )
         .setRequired(false)
     )
@@ -740,16 +1075,16 @@ const commands = [
   command.toJSON()
 );
 
-/* =========================================
-   READY
-========================================= */
+/* =====================================================
+   عند تشغيل البوت
+===================================================== */
 
 client.once(
   "ready",
   async () => {
 
     console.log(
-      `✅ Logged in as ${client.user.tag}`
+      `✅ تم تسجيل الدخول باسم ${client.user.tag}`
     );
 
     const rest =
@@ -760,7 +1095,7 @@ client.once(
     try {
 
       console.log(
-        "⏳ Registering /dna..."
+        "⏳ جاري تسجيل أمر /dna..."
       );
 
       await rest.put(
@@ -773,23 +1108,22 @@ client.once(
       );
 
       console.log(
-        "✅ /dna registered successfully!"
+        "✅ تم تسجيل أمر /dna بنجاح."
       );
 
     } catch (error) {
 
       console.error(
-        "❌ Command registration error:"
+        "❌ حدث خطأ أثناء تسجيل الأمر:",
+        error
       );
-
-      console.error(error);
     }
   }
 );
 
-/* =========================================
-   MESSAGE COUNTER
-========================================= */
+/* =====================================================
+   حساب الرسائل
+===================================================== */
 
 client.on(
   "messageCreate",
@@ -815,9 +1149,9 @@ client.on(
   }
 );
 
-/* =========================================
-   VOICE TRACKER
-========================================= */
+/* =====================================================
+   حساب وقت المكالمات
+===================================================== */
 
 client.on(
   "voiceStateUpdate",
@@ -886,9 +1220,9 @@ client.on(
   }
 );
 
-/* =========================================
-   INTERACTION
-========================================= */
+/* =====================================================
+   أوامر التفاعل
+===================================================== */
 
 client.on(
   "interactionCreate",
@@ -910,10 +1244,14 @@ client.on(
 
       await interaction.deferReply();
 
+      /* العضو المطلوب */
+
       const selectedUser =
         interaction.options.getUser(
           "member"
         ) || interaction.user;
+
+      /* جلب العضو */
 
       const member =
         await interaction.guild.members
@@ -925,9 +1263,19 @@ client.on(
       if (!member) {
 
         return interaction.editReply(
-          "❌ العضو ده مش موجود في السيرفر."
+          "❌ هذا العضو غير موجود في السيرفر."
         );
       }
+
+      /* رقم العضو */
+
+      const memberNumber =
+        await getMemberNumber(
+          interaction.guild,
+          member
+        );
+
+      /* بيانات العضو */
 
       const memberData =
         getMemberData(
@@ -935,17 +1283,22 @@ client.on(
           selectedUser.id
         );
 
+      /* إنشاء الصورة */
+
       const image =
         await createDNAImage(
           member,
-          memberData
+          memberData,
+          memberNumber
         );
+
+      /* الصورة المرفقة */
 
       const attachment =
         new AttachmentBuilder(
           image,
           {
-            name: "dna.png"
+            name: "بطاقة-العضو.png"
           }
         );
 
@@ -956,7 +1309,7 @@ client.on(
     } catch (error) {
 
       console.error(
-        "❌ DNA command error:",
+        "❌ حدث خطأ في أمر DNA:",
         error
       );
 
@@ -964,7 +1317,7 @@ client.on(
 
         await interaction
           .editReply(
-            "❌ حصل خطأ أثناء إنشاء بطاقة DNA."
+            "❌ حدث خطأ أثناء إنشاء بطاقة العضو."
           )
           .catch(() => {});
 
@@ -973,7 +1326,7 @@ client.on(
         await interaction
           .reply({
             content:
-              "❌ حصل خطأ أثناء تنفيذ الأمر.",
+              "❌ حدث خطأ أثناء تنفيذ الأمر.",
             ephemeral: true
           })
           .catch(() => {});
@@ -982,16 +1335,16 @@ client.on(
   }
 );
 
-/* =========================================
-   ERROR HANDLING
-========================================= */
+/* =====================================================
+   معالجة الأخطاء
+===================================================== */
 
 process.on(
   "unhandledRejection",
   error => {
 
     console.error(
-      "❌ Unhandled rejection:",
+      "❌ خطأ غير معالج:",
       error
     );
   }
@@ -1002,18 +1355,18 @@ process.on(
   error => {
 
     console.error(
-      "❌ Uncaught exception:",
+      "❌ خطأ في البرنامج:",
       error
     );
   }
 );
 
-/* =========================================
-   LOGIN
-========================================= */
+/* =====================================================
+   تشغيل تسجيل الدخول
+===================================================== */
 
 console.log(
-  "⏳ Connecting to Discord..."
+  "⏳ جاري الاتصال بديسكورد..."
 );
 
 client.login(TOKEN);
