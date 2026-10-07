@@ -16,6 +16,7 @@ const sharp = require("sharp");
 ===================================================== */
 
 const CLIENT_ID = "1557370938650271824";
+const DNA_CHANNEL_ID = "1557391771527553125";
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
@@ -52,7 +53,10 @@ if (fs.existsSync(DATA_FILE)) {
       fs.readFileSync(DATA_FILE, "utf8")
     );
   } catch {
-    console.log("⚠️ تعذر قراءة ملف البيانات، سيتم إنشاء ملف جديد.");
+    console.log(
+      "⚠️ تعذر قراءة ملف البيانات، سيتم إنشاء ملف جديد."
+    );
+
     data = {};
   }
 }
@@ -768,9 +772,6 @@ async function createDNAImage(
       داخل السيرفر منذ
     </text>
 
-    <!-- الأيام والساعات
-         منفصلة لمنع انقلاب ترتيب العربي -->
-
     <text
       x="75"
       y="335"
@@ -976,8 +977,6 @@ async function createDNAImage(
          المعلومات الإضافية
     ================================================= -->
 
-    <!-- عمر الحساب -->
-
     <text
       x="150"
       y="447"
@@ -1001,8 +1000,6 @@ async function createDNAImage(
       ${accountAge.number} ${accountAge.text}
     </text>
 
-    <!-- عدد الرتب -->
-
     <text
       x="500"
       y="447"
@@ -1025,8 +1022,6 @@ async function createDNAImage(
     >
       ${roleCount} رتبة
     </text>
-
-    <!-- ترتيب العضو -->
 
     <text
       x="850"
@@ -1089,25 +1084,170 @@ async function createDNAImage(
 }
 
 /* =====================================================
-   أمر DNA
+   أوامر البوت
 ===================================================== */
 
 const commands = [
   new SlashCommandBuilder()
     .setName("dna")
-    .setDescription(
-      "عرض بطاقة تعريف العضو وإحصائياته"
-    )
-    .addUserOption(option =>
-      option
-        .setName("member")
-        .setDescription(
-          "اختر العضو الذي تريد عرض بطاقته"
-        )
-        .setRequired(false)
-    )
+    .setDescription("عرض بطاقة تعريفك وإحصائياتك")
 ].map(command =>
   command.toJSON()
+);
+
+/* =====================================================
+   تسجيل الأمر
+===================================================== */
+
+const rest = new REST({
+  version: "10"
+}).setToken(TOKEN);
+
+async function registerCommands() {
+  try {
+    console.log("🔄 جاري تسجيل أمر /dna...");
+
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID),
+      {
+        body: commands
+      }
+    );
+
+    console.log("✅ تم تسجيل أمر /dna بنجاح.");
+  } catch (error) {
+    console.error(
+      "❌ خطأ أثناء تسجيل الأوامر:",
+      error
+    );
+  }
+}
+
+/* =====================================================
+   استقبال أمر DNA
+===================================================== */
+
+client.on(
+  "interactionCreate",
+  async interaction => {
+
+    if (!interaction.isChatInputCommand()) {
+      return;
+    }
+
+    if (interaction.commandName !== "dna") {
+      return;
+    }
+
+    /* =================================================
+       التأكد من قناة DNA
+    ================================================= */
+
+    if (
+      interaction.channelId !==
+      DNA_CHANNEL_ID
+    ) {
+      return interaction.reply({
+        content:
+          "❌ استخدم أمر /dna في قناة التعريف فقط.",
+        ephemeral: true
+      });
+    }
+
+    try {
+
+      /* =================================================
+         المستخدم نفسه فقط
+      ================================================= */
+
+      const selectedUser =
+        interaction.user;
+
+      /* =================================================
+         التأكد من وجود العضو في السيرفر
+      ================================================= */
+
+      const member =
+        await interaction.guild.members.fetch(
+          selectedUser.id
+        );
+
+      /* =================================================
+         بيانات العضو
+      ================================================= */
+
+      const memberData =
+        getMemberData(
+          interaction.guild.id,
+          selectedUser.id
+        );
+
+      /* =================================================
+         رقم العضو
+      ================================================= */
+
+      const memberNumber =
+        await getMemberNumber(
+          interaction.guild,
+          member
+        );
+
+      /* =================================================
+         إنشاء صورة DNA
+      ================================================= */
+
+      const imageBuffer =
+        await createDNAImage(
+          member,
+          memberData,
+          memberNumber
+        );
+
+      /* =================================================
+         إرسال الصورة
+      ================================================= */
+
+      const attachment =
+        new AttachmentBuilder(
+          imageBuffer,
+          {
+            name: "dna.png"
+          }
+        );
+
+      await interaction.reply({
+        files: [attachment]
+      });
+
+    } catch (error) {
+
+      console.error(
+        "❌ خطأ في أمر /dna:",
+        error
+      );
+
+      if (
+        interaction.replied ||
+        interaction.deferred
+      ) {
+
+        await interaction.followUp({
+          content:
+            "❌ حدث خطأ أثناء إنشاء بطاقة التعريف.",
+          ephemeral: true
+        });
+
+      } else {
+
+        await interaction.reply({
+          content:
+            "❌ حدث خطأ أثناء إنشاء بطاقة التعريف.",
+          ephemeral: true
+        });
+
+      }
+    }
+  }
 );
 
 /* =====================================================
@@ -1122,286 +1262,12 @@ client.once(
       `✅ تم تسجيل الدخول باسم ${client.user.tag}`
     );
 
-    const rest =
-      new REST({
-        version: "10"
-      }).setToken(TOKEN);
-
-    try {
-
-      console.log(
-        "⏳ جاري تسجيل أمر /dna..."
-      );
-
-      await rest.put(
-        Routes.applicationCommands(
-          CLIENT_ID
-        ),
-        {
-          body: commands
-        }
-      );
-
-      console.log(
-        "✅ تم تسجيل أمر /dna بنجاح."
-      );
-
-    } catch (error) {
-
-      console.error(
-        "❌ خطأ في تسجيل الأمر:",
-        error
-      );
-    }
+    await registerCommands();
   }
 );
 
 /* =====================================================
-   عداد الرسائل
+   تشغيل
 ===================================================== */
-
-client.on(
-  "messageCreate",
-  message => {
-
-    if (!message.guild) {
-      return;
-    }
-
-    if (message.author.bot) {
-      return;
-    }
-
-    const memberData =
-      getMemberData(
-        message.guild.id,
-        message.author.id
-      );
-
-    memberData.messages++;
-
-    saveData();
-  }
-);
-
-/* =====================================================
-   حساب وقت المكالمات
-===================================================== */
-
-client.on(
-  "voiceStateUpdate",
-  (oldState, newState) => {
-
-    if (!newState.guild) {
-      return;
-    }
-
-    if (newState.member?.user.bot) {
-      return;
-    }
-
-    const memberData =
-      getMemberData(
-        newState.guild.id,
-        newState.id
-      );
-
-    const wasInVoice =
-      Boolean(oldState.channelId);
-
-    const isInVoice =
-      Boolean(newState.channelId);
-
-    /* دخول المكالمة */
-
-    if (
-      !wasInVoice &&
-      isInVoice
-    ) {
-
-      memberData.voiceStarted =
-        Date.now();
-
-      saveData();
-
-      return;
-    }
-
-    /* الخروج من المكالمة */
-
-    if (
-      wasInVoice &&
-      !isInVoice
-    ) {
-
-      if (
-        memberData.voiceStarted
-      ) {
-
-        memberData.voiceSeconds +=
-          Math.floor(
-            (
-              Date.now() -
-              memberData.voiceStarted
-            ) / 1000
-          );
-      }
-
-      memberData.voiceStarted =
-        null;
-
-      saveData();
-    }
-  }
-);
-
-/* =====================================================
-   تنفيذ أمر DNA
-===================================================== */
-
-client.on(
-  "interactionCreate",
-  async interaction => {
-
-    if (
-      !interaction.isChatInputCommand()
-    ) {
-      return;
-    }
-
-    if (
-      interaction.commandName !== "dna"
-    ) {
-      return;
-    }
-
-    try {
-
-      await interaction.deferReply();
-
-      /* العضو المحدد */
-
-      const selectedUser =
-        interaction.options.getUser(
-          "member"
-        ) || interaction.user;
-
-      /* جلب العضو */
-
-      const member =
-        await interaction.guild.members
-          .fetch(
-            selectedUser.id
-          )
-          .catch(() => null);
-
-      if (!member) {
-
-        return interaction.editReply(
-          "❌ هذا العضو غير موجود في السيرفر."
-        );
-      }
-
-      /* رقم العضو */
-
-      const memberNumber =
-        await getMemberNumber(
-          interaction.guild,
-          member
-        );
-
-      /* بيانات العضو */
-
-      const memberData =
-        getMemberData(
-          interaction.guild.id,
-          selectedUser.id
-        );
-
-      /* إنشاء الصورة */
-
-      const image =
-        await createDNAImage(
-          member,
-          memberData,
-          memberNumber
-        );
-
-      /* إرسال الصورة */
-
-      const attachment =
-        new AttachmentBuilder(
-          image,
-          {
-            name: "بطاقة-العضو.png"
-          }
-        );
-
-      await interaction.editReply({
-        files: [attachment]
-      });
-
-    } catch (error) {
-
-      console.error(
-        "❌ خطأ في أمر DNA:",
-        error
-      );
-
-      if (interaction.deferred) {
-
-        await interaction
-          .editReply(
-            "❌ حدث خطأ أثناء إنشاء بطاقة العضو."
-          )
-          .catch(() => {});
-
-      } else {
-
-        await interaction
-          .reply({
-            content:
-              "❌ حدث خطأ أثناء تنفيذ الأمر.",
-            ephemeral: true
-          })
-          .catch(() => {});
-      }
-    }
-  }
-);
-
-/* =====================================================
-   معالجة الأخطاء
-===================================================== */
-
-process.on(
-  "unhandledRejection",
-  error => {
-
-    console.error(
-      "❌ خطأ غير معالج:",
-      error
-    );
-  }
-);
-
-process.on(
-  "uncaughtException",
-  error => {
-
-    console.error(
-      "❌ خطأ في البرنامج:",
-      error
-    );
-  }
-);
-
-/* =====================================================
-   تسجيل الدخول
-===================================================== */
-
-console.log(
-  "⏳ جاري الاتصال بديسكورد..."
-);
 
 client.login(TOKEN);
